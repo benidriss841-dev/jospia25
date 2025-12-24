@@ -369,6 +369,18 @@ function renderDashboard() {
       </div>
       ${generateTableHTML(seminaristes.slice(-5).reverse())}
     </div>
+
+    <div class="table-card" style="margin-top: 1rem; border-color: var(--danger);">
+        <div class="table-header" style="background-color: #fee2e2;">
+            <h4 style="color: var(--danger);">Zone de Danger</h4>
+        </div>
+        <div style="padding: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <p style="margin: 0; color: var(--danger);">Supprimer toutes les données de l'application.</p>
+            <button class="btn btn-outline" style="color: var(--danger); border-color: var(--danger);" onclick="deleteAllData()">
+                <i class="ri-delete-bin-line"></i> Tout Supprimer
+            </button>
+        </div>
+    </div>
   `;
     view.innerHTML = html;
 }
@@ -463,7 +475,7 @@ function renderForm(data = null) {
             </div>
             <div class="form-group">
               <label class="form-label">Note</label>
-              <input type="number" step="0.1" id="f_note" class="form-control" value="${data?.note || ''}">
+              <input type="number" step="0.1" id="f_note" class="form-control" value="${data?.note !== undefined ? data.note : '10'}">
             </div>
             <div class="form-group">
               <label class="form-label">Genre</label>
