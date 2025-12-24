@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JOSPIA — Gestion Séminaristes</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+    <!-- SheetJS -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo">
+                    <span>J</span>
+                </div>
+                <div class="brand-text">
+                    <h1>JOSPIA</h1>
+                    <p>Commission Scientifique</p>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <div class="nav-group">
+                    <p class="nav-label">Menu</p>
+                    <a href="#" class="nav-link active" data-route="dashboard">
+                        <i class="ri-dashboard-line"></i>
+                        <span>Tableau de bord</span>
+                    </a>
+                    <a href="#" class="nav-link" data-route="all">
+                        <i class="ri-team-line"></i>
+                        <span>Séminaristes</span>
+                    </a>
+                    <a href="#" class="nav-link" data-route="search">
+                        <i class="ri-search-line"></i>
+                        <span>Recherche</span>
+                    </a>
+                    <a href="#" class="nav-link" data-route="add">
+                        <i class="ri-user-add-line"></i>
+                        <span>Nouveau</span>
+                    </a>
+                </div>
+
+                <div class="nav-group">
+                    <p class="nav-label">Filtres</p>
+                    <a href="#" class="nav-link" data-route="levels">
+                        <i class="ri-bar-chart-grouped-line"></i>
+                        <span>Par Niveau</span>
+                    </a>
+                    <a href="#" class="nav-link" data-route="dortoirs">
+                        <i class="ri-building-4-line"></i>
+                        <span>Par Dortoir</span>
+                    </a>
+                    <a href="#" class="nav-link" data-route="harakas">
+                        <i class="ri-group-line"></i>
+                        <span>Par Halaqa</span>
+                    </a>
+                </div>
+
+                <div class="nav-group">
+                    <p class="nav-label">Données</p>
+                    <a href="#" class="nav-link" data-route="import">
+                        <i class="ri-file-excel-line"></i>
+                        <span>Import / Export</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p>JOSPIA Manager v2.0</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="page-title">
+                    <h2 id="pageTitle">Tableau de bord</h2>
+                </div>
+                <div class="user-profile">
+                    <div class="avatar">A</div>
+                    <span>Admin</span>
+                </div>
+            </header>
+
+            <div id="view" class="content-area">
+                <!-- Dynamic Content Injected Here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- App Logic -->
+    <script src="app.js"></script>
+</body>
+
+</html>
