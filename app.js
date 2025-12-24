@@ -137,6 +137,36 @@ async function deleteData(matricule) {
     }
 }
 
+async function deleteAllData() {
+    if (!confirm('ATTENTION: Vous allez supprimer TOUS les séminaristes.\n\nCette action est IRRÉVERSIBLE.\n\nVoulez-vous vraiment continuer ?')) return;
+
+    // Seconde confirmation
+    if (!prompt('Pour confirmer, tapez "SUPPRIMER" en majuscules :') === 'SUPPRIMER') {
+        showToast('Suppression annulée', 'info');
+        return;
+    }
+
+    if (USE_LOCAL_STORAGE) {
+        seminaristes = [];
+        localStorage.removeItem(DB_KEY);
+        showToast('Toutes les données ont été effacées', 'success');
+        renderDashboard();
+    } else {
+        try {
+            // Suppression via Supabase (nécessite une condition qui couvre tout, ex: matricule non vide)
+            const { error } = await supabaseClient.from('seminaristes').delete().neq('matricule', '000000');
+            if (error) throw error;
+
+            await loadData();
+            showToast('Base de données vidée avec succès', 'success');
+            renderDashboard();
+        } catch (err) {
+            console.error('Delete ALL error', err);
+            showToast('Erreur lors de la suppression totale', 'error');
+        }
+    }
+}
+
 async function batchImport(rows) {
     // Ensure fields
     const prepared = rows.map(r => ensureDerivedFields(r));
@@ -712,6 +742,22 @@ function renderImportExport() {
         <div style="padding:2rem">
           <p class="form-label" style="margin-bottom:1rem">Télécharger la liste complète.</p>
           <button class="btn btn-accent" onclick="exportExcel(seminaristes)">Exporter tout (.xlsx)</button>
+        </div>
+      </div>
+
+      <!-- Zone Danger -->
+      <div class="table-card" style="grid-column: 1 / -1; border: 1px solid var(--danger);">
+        <div class="table-header" style="background-color: #fee2e2;">
+            <h4 style="color: var(--danger);">Zone de Danger</h4>
+        </div>
+        <div style="padding:2rem">
+          <p class="form-label" style="margin-bottom:1rem; color:var(--danger)">
+            Cette action supprimera DÉFINITIVEMENT tous les séminaristes enregistrés.<br>
+            Il est recommandé de faire un export avant de procéder.
+          </p>
+          <button class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);" onclick="deleteAllData()">
+            <i class="ri-delete-bin-line"></i> TOUT SUPPRIMER
+          </button>
         </div>
       </div>
     </div>
