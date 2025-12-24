@@ -151,7 +151,7 @@ async function batchImport(rows) {
             await loadData();
         } catch (err) {
             console.error('Batch import error', err);
-            showToast('Erreur import', 'error');
+            showToast(`Erreur import: ${err.message || err.details}`, 'error');
         }
     }
 }
@@ -261,8 +261,8 @@ function routeTo(route, param = null) {
             else showToast('Introuvable', 'error');
             break;
         case 'levels':
-            pageTitle.innerText = 'Niveaux';
-            renderGroupList('niveau', ['NIVEAU PRIMAIRE', 'NIVEAU SECONDAIRE', 'NIVEAU UNIVERSITAIRE']);
+            pageTitle.innerText = 'Niveaux par Genre';
+            renderLevelsByGenre();
             break;
         case 'dortoirs':
             pageTitle.innerText = 'Dortoirs';
@@ -283,6 +283,17 @@ function routeTo(route, param = null) {
             pageTitle.innerText = `${param.value}`;
             const filtered = seminaristes.filter(s => s[param.key] === param.value);
             renderTable(filtered, true); // true = show back button
+            break;
+        case 'filtered_multi':
+            // param is { filters: {key: val, ...}, title: '...' }
+            pageTitle.innerText = param.title;
+            const multipass = seminaristes.filter(s => {
+                for (let k in param.filters) {
+                    if (s[k] !== param.filters[k]) return false;
+                }
+                return true;
+            });
+            renderTable(multipass, true);
             break;
         default:
             renderDashboard();
@@ -449,6 +460,7 @@ function renderForm(data = null) {
             <div id="cameraContainer" style="display:none; flex-direction:column; gap:0.5rem; margin-top:0.5rem; background:#000; padding:0.5rem; border-radius:8px;">
                 <video id="cameraVideo" autoplay playsinline style="width:100%; max-height:300px; object-fit:cover; border-radius:4px; transform: scaleX(-1);"></video>
                 <div style="display:flex; justify-content:center; gap:1rem;">
+                    <button type="button" class="btn btn-primary" id="btnSwitchCamera"><i class="ri-camera-switch-line"></i></button>
                     <button type="button" class="btn btn-danger" id="btnCapture"><i class="ri-camera-lens-line"></i> Capturer</button>
                     <button type="button" class="btn btn-outline" style="color:white; border-color:white" id="btnStopCamera">Fermer</button>
                 </div>
@@ -475,24 +487,38 @@ function renderForm(data = null) {
     // Camera variables
     let stream = null;
     let capturedFile = null;
+    let currentFacingMode = 'user'; // 'user' or 'environment'
 
     const btnStart = document.getElementById('btnStartCamera');
     const btnStop = document.getElementById('btnStopCamera');
+    const btnSwitch = document.getElementById('btnSwitchCamera');
     const btnCapture = document.getElementById('btnCapture');
     const video = document.getElementById('cameraVideo');
     const container = document.getElementById('cameraContainer');
     const preview = document.getElementById('preview');
 
-    btnStart.onclick = async () => {
+    async function startCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: currentFacingMode }
+            });
             video.srcObject = stream;
+            // Mirror only if self-facing
+            video.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
             container.style.display = 'flex';
             btnStart.style.display = 'none';
         } catch (err) {
             console.error(err);
             showToast('Impossible d\'accéder à la caméra', 'error');
         }
+    }
+
+    btnStart.onclick = () => {
+        currentFacingMode = 'user';
+        startCamera();
     };
 
     const stopStream = () => {
@@ -507,14 +533,22 @@ function renderForm(data = null) {
 
     btnStop.onclick = stopStream;
 
+    btnSwitch.onclick = () => {
+        currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+        startCamera();
+    };
+
     btnCapture.onclick = () => {
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
-        // Mirror effect fix
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+
+        // Mirror effect only for selfie
+        if (currentFacingMode === 'user') {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+        }
         ctx.drawImage(video, 0, 0);
 
         // Convert to file
@@ -623,6 +657,43 @@ function renderGroupList(key, items) {
     view.innerHTML = `<div class="list-group" style="max-width:600px">${listHtml}</div>`;
 }
 
+function renderLevelsByGenre() {
+    const levels = ['NIVEAU PRIMAIRE', 'NIVEAU SECONDAIRE', 'NIVEAU UNIVERSITAIRE'];
+    const groups = [];
+
+    levels.forEach(lvl => {
+        // Count M
+        const countM = seminaristes.filter(s => s.niveau === lvl && s.genre === 'M').length;
+        groups.push({
+            title: `${lvl} - FRÈRES`,
+            filters: { niveau: lvl, genre: 'M' },
+            count: countM,
+            icon: 'ri-men-line'
+        });
+
+        // Count F
+        const countF = seminaristes.filter(s => s.niveau === lvl && s.genre === 'F').length;
+        groups.push({
+            title: `${lvl} - SOEURS`,
+            filters: { niveau: lvl, genre: 'F' },
+            count: countF,
+            icon: 'ri-women-line'
+        });
+    });
+
+    const listHtml = groups.map(g => `
+    <a href="#" class="list-item" onclick='routeTo("filtered_multi", { filters: ${JSON.stringify(g.filters)}, title: "${g.title}" })'>
+        <div style="display:flex; align-items:center; gap:0.5rem">
+            <i class="${g.icon}"></i>
+            <span>${g.title}</span>
+        </div>
+      <span class="badge">${g.count}</span>
+    </a>
+  `).join('');
+
+    view.innerHTML = `<div class="list-group" style="max-width:600px">${listHtml}</div>`;
+}
+
 // 6. Import
 function renderImportExport() {
     view.innerHTML = `
@@ -666,11 +737,19 @@ function renderImportExport() {
                         return '';
                     };
 
+                    // Helper to safely parse numbers
+                    const getNum = (keys) => {
+                        const val = getVal(keys);
+                        if (val === '' || val === null || val === undefined) return null;
+                        const num = Number(val);
+                        return isNaN(num) ? null : num;
+                    };
+
                     return {
                         nom: getVal(['Nom', 'nom', 'NOM']),
                         prenom: getVal(['Prenom', 'prenom', 'PRENOM']),
-                        age: getVal(['Age', 'age']),
-                        note: getVal(['Note', 'note']),
+                        age: getNum(['Age', 'age']),
+                        note: getNum(['Note', 'note']),
                         genre: getVal(['Genre', 'genre', 'Sexe']),
                         contact: getVal(['Contact', 'contact'])
                     };
