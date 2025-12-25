@@ -168,8 +168,16 @@ async function deleteAllData() {
 }
 
 async function batchImport(rows) {
+    let baseId = getLastMatriculeId();
     // Ensure fields
-    const prepared = rows.map(r => ensureDerivedFields(r));
+    const prepared = rows.map((r, i) => {
+        // Pre-assign matricule if missing to ensure uniqueness in batch
+        if (!r.matricule) {
+            baseId++;
+            r.matricule = '25-JOS' + baseId.toString().padStart(3, '0');
+        }
+        return ensureDerivedFields(r);
+    });
 
     if (USE_LOCAL_STORAGE) {
         seminaristes = [...seminaristes, ...prepared];
@@ -189,11 +197,23 @@ async function batchImport(rows) {
 /* ==============================================
    BUSINESS LOGIC
    ============================================== */
+function getLastMatriculeId() {
+    let maxId = 0;
+    const prefix = '25-JOS';
+    seminaristes.forEach(s => {
+        if (s.matricule && s.matricule.startsWith(prefix)) {
+            const num = parseInt(s.matricule.replace(prefix, ''), 10);
+            if (!isNaN(num) && num > maxId) maxId = num;
+        }
+    });
+    return maxId;
+}
+
 function ensureDerivedFields(s) {
     // 1. Matricule if missing
     if (!s.matricule) {
-        // simple generator using timestamp + random for uniqueness
-        s.matricule = '25-JOS' + Math.floor(Date.now() % 10000).toString().padStart(4, '0');
+        const next = getLastMatriculeId() + 1;
+        s.matricule = '25-JOS' + next.toString().padStart(3, '0');
     }
 
     // 2. Genre normalization
@@ -633,6 +653,21 @@ function renderForm(data = null) {
                 contact: document.getElementById('f_contact').value,
                 photo_url: photoUrl
             };
+
+            // Merge with existing data to keep fields like dortoir/halaqa
+            if (data) {
+                const preserved = { ...data };
+                // Remove fields we want to overwrite from the form
+                delete preserved.nom;
+                delete preserved.prenom;
+                delete preserved.age;
+                delete preserved.note;
+                delete preserved.genre;
+                delete preserved.contact;
+                delete preserved.photo_url;
+
+                Object.assign(payload, preserved);
+            }
 
             await saveData(payload, isEdit);
             showToast('Enregistré avec succès', 'success');
