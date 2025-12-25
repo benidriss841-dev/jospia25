@@ -479,3 +479,22 @@ tr:hover td {
         padding: 1rem;
     }
 }
+
+.header-top {
+    display: flex;
+    align-items: center;
+    /* aligne verticalement */
+    gap: 12px;
+    /* espace entre logo et texte */
+    padding: 10px 20px;
+}
+
+.header-logo {
+    width: 60px;
+    height: auto;
+}
+
+.header-top h3 {
+    margin: 0;
+    font-weight: 600;
+}
