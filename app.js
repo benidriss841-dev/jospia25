@@ -789,6 +789,11 @@ function renderImportExport() {
         <div style="padding:2rem">
           <p class="form-label" style="margin-bottom:1rem">Télécharger la liste complète.</p>
           <button class="btn btn-accent" onclick="exportExcel(seminaristes)">Exporter tout (.xlsx)</button>
+          
+          <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
+          
+          <p class="form-label" style="margin-bottom:1rem">Télécharger les photos (pour les badges).</p>
+          <button class="btn btn-primary" onclick="exportImages()">Exporter Photos (.zip)</button>
         </div>
       </div>
 
@@ -871,6 +876,64 @@ function exportExcel(data) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Export");
     XLSX.writeFile(wb, "seminaristes_export.xlsx");
+}
+
+async function exportImages() {
+    if (!seminaristes || seminaristes.length === 0) return showToast('Aucun séminariste', 'warning');
+
+    const withPhotos = seminaristes.filter(s => s.photo_url);
+    if (withPhotos.length === 0) return showToast('Aucune photo trouvée', 'warning');
+
+    const zip = new JSZip();
+    let count = 0;
+    const btn = event.target; // Get button if possible
+    const oldText = btn.innerText;
+    btn.innerText = 'Préparation...';
+    btn.disabled = true;
+
+    try {
+        const promises = withPhotos.map(async (s) => {
+            try {
+                // If it's a data URL (base64)
+                if (s.photo_url.startsWith('data:')) {
+                    const base64Data = s.photo_url.split(',')[1];
+                    zip.file(`${s.matricule}.jpg`, base64Data, { base64: true });
+                    count++;
+                } else {
+                    // It's a remote URL
+                    const response = await fetch(s.photo_url);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        zip.file(`${s.matricule}.jpg`, blob);
+                        count++;
+                    }
+                }
+            } catch (err) {
+                console.warn(`Failed to load image for ${s.matricule}`, err);
+            }
+        });
+
+        await Promise.all(promises);
+
+        if (count === 0) throw new Error('Aucune image n\'a pu être traitée');
+
+        const content = await zip.generateAsync({ type: "blob" });
+        const url = window.URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "photos_export.zip";
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        showToast(`${count} photos exportées`, 'success');
+
+    } catch (err) {
+        console.error('Export zip failed', err);
+        showToast('Erreur lors de l\'export des photos', 'error');
+    } finally {
+        btn.innerText = oldText;
+        btn.disabled = false;
+    }
 }
 
 
