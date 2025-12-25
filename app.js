@@ -1050,11 +1050,39 @@ let badgeConfig = {
 // Start Editor
 function renderBadgeEditor() {
     view.innerHTML = `
-    <div class="grid-form" style="display:grid; grid-template-columns: 300px 1fr; gap:2rem;">
+    <div style="margin-bottom:1.5rem; display:flex; border-bottom:1px solid #ddd;">
+        <button class="btn nav-link active" id="tabSimple" onclick="switchBadgeTab('simple')" style="border-radius:0; border-bottom:2px solid var(--primary);">Mode Rapide</button>
+        <button class="btn nav-link" id="tabAdvanced" onclick="switchBadgeTab('advanced')" style="border-radius:0;">Éditeur Avancé</button>
+    </div>
+
+    <!-- SIMPLE MODE -->
+    <div id="badge-simple" style="display:block;">
+        <div class="table-card" style="max-width:800px; margin:0 auto; padding:2rem;">
+             <h4 class="mb-3">Générateur Automatique</h4>
+             <p class="text-muted mb-4">Chargez simplement votre modèle de badge, l'application s'occupe du reste en plaçant la photo à gauche et les infos à droite.</p>
+             
+             <div class="form-group mb-4">
+                <label class="form-label">Modèle de Badge (Image vierge)</label>
+                <input type="file" id="simpleTemplateInput" accept="image/*" class="form-control">
+             </div>
+             
+             <div class="form-group mb-4">
+                <label class="form-label">Titre du Badge (Optionnel)</label>
+                <input type="text" id="simpleBadgeTitle" class="form-control" placeholder="Ex: CARTE DE MEMBRE">
+             </div>
+
+             <button class="btn btn-primary btn-lg" style="width:100%" onclick="generateSimpleBadges()">
+                <i class="ri-magic-line"></i> Générer les Badges (.docx)
+             </button>
+        </div>
+    </div>
+
+    <!-- ADVANCED MODE -->
+    <div id="badge-advanced" class="grid-form" style="display:none; grid-template-columns: 300px 1fr; gap:2rem;">
         
         <!-- Controls -->
         <div class="table-card" style="height:fit-content">
-            <div class="table-header"><h4>Configuration</h4></div>
+            <div class="table-header"><h4>Configuration Manuelle</h4></div>
             <div style="padding:1.5rem">
                 <div class="form-group">
                     <label class="form-label">1. Modèle (Image)</label>
@@ -1071,9 +1099,8 @@ function renderBadgeEditor() {
                 <hr style="margin:1rem 0; border:0; border-top:1px solid #eee;">
                 
                 <button class="btn btn-primary" style="width:100%" onclick="generateBadgesWord()">
-                    <i class="ri-file-word-line"></i> Générer Badges (Word)
+                    <i class="ri-file-word-line"></i> Générer (Avancé)
                 </button>
-                <div class="small text-muted mt-2" style="text-align:center">Génère pour tous les séminaristes</div>
             </div>
         </div>
 
@@ -1088,6 +1115,48 @@ function renderBadgeEditor() {
     initBadgeCanvas();
     renderBadgeControls();
 }
+
+window.switchBadgeTab = (tab) => {
+    document.getElementById('badge-simple').style.display = tab === 'simple' ? 'block' : 'none';
+    document.getElementById('badge-advanced').style.display = tab === 'advanced' ? 'grid' : 'none';
+
+    document.getElementById('tabSimple').style.borderBottom = tab === 'simple' ? '2px solid var(--primary)' : 'none';
+    document.getElementById('tabAdvanced').style.borderBottom = tab === 'advanced' ? '2px solid var(--primary)' : 'none';
+
+    document.getElementById('tabSimple').classList.toggle('active', tab === 'simple');
+    document.getElementById('tabAdvanced').classList.toggle('active', tab === 'advanced');
+};
+
+async function generateSimpleBadges() {
+    const file = document.getElementById('simpleTemplateInput').files[0];
+    if (!file) return showToast('Veuillez sélectionner une image modèle', 'warning');
+    const title = document.getElementById('simpleBadgeTitle').value;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        // Create a config on the fly for the standard Horizontal layout
+        // Assuming 600x400 standard badge
+        const simpleConfig = {
+            template: e.target.result,
+            fields: {
+                // Photo Area (Left)
+                photo: { x: 30, y: 100, w: 120, h: 150, active: true },
+                // Header
+                header: { x: 300, y: 60, size: 24, color: '#000', label: title, active: !!title, type: 'static' },
+                // Info (Right)
+                nom: { x: 180, y: 120, size: 22, color: '#000', active: true, label: 'Nom' },
+                prenom: { x: 180, y: 155, size: 22, color: '#000', active: true, label: 'Prenom' },
+                matricule: { x: 180, y: 200, size: 18, color: '#555', active: true, label: 'Matricule' },
+                niveau: { x: 180, y: 230, size: 16, color: '#555', active: true, label: 'Niveau' },
+                dortoir: { x: 180, y: 260, size: 16, color: '#555', active: true, label: 'Dortoir' }
+            }
+        };
+        // Use common generation logic passing custom config
+        generateBadgesWord(simpleConfig);
+    };
+    reader.readAsDataURL(file);
+}
+
 
 function renderBadgeControls() {
     const container = document.getElementById('badgeFieldsControl');
@@ -1275,12 +1344,17 @@ window.updateBadgeColor = (key, color) => {
 /* ==============================================
    GENERATION LOGIC (WORD)
    ============================================== */
-async function generateBadgesWord() {
+// Updated to accept optional config (for Simple Mode)
+async function generateBadgesWord(customConfig = null) {
     if (seminaristes.length === 0) return showToast('Aucun séminariste', 'warning');
 
-    const btn = event.target;
-    btn.innerHTML = '<i class="ri-loader-4-line ri-spin"></i> Génération...';
-    btn.disabled = true;
+    const configToUse = customConfig || badgeConfig;
+
+    const btn = event?.target || document.querySelector('button.btn-primary');
+    if (btn) {
+        btn.innerHTML = '<i class="ri-loader-4-line ri-spin"></i> Génération...';
+        btn.disabled = true;
+    }
 
     try {
         const { Document, Packer, Paragraph, ImageRun, TextRun } = docx;
@@ -1293,8 +1367,8 @@ async function generateBadgesWord() {
 
         // Preload template
         let templateImg = null;
-        if (badgeConfig.template) {
-            templateImg = await loadImage(badgeConfig.template);
+        if (configToUse.template) {
+            templateImg = await loadImage(configToUse.template);
         }
 
         const paragraphs = [];
@@ -1314,7 +1388,7 @@ async function generateBadgesWord() {
             }
 
             // 2. Draw Photo
-            const fPhoto = badgeConfig.fields['photo'];
+            const fPhoto = configToUse.fields['photo'];
             if (fPhoto.active && s.photo_url) {
                 try {
                     const pImg = await loadImage(s.photo_url);
@@ -1326,9 +1400,20 @@ async function generateBadgesWord() {
             }
 
             // 3. Draw Text
-            Object.keys(badgeConfig.fields).forEach(key => {
-                const f = badgeConfig.fields[key];
-                if (!f.active || f.type !== 'text') return;
+            Object.keys(configToUse.fields).forEach(key => {
+                const f = configToUse.fields[key];
+                if (!f.active) return;
+
+                // Static fields (like Title)
+                if (f.type === 'static') {
+                    genCtx.fillStyle = f.color;
+                    genCtx.font = `bold ${f.size}px Arial`;
+                    genCtx.textAlign = 'center'; // Center align for title
+                    genCtx.fillText(f.label, f.x, f.y);
+                    genCtx.textAlign = 'start'; // Reset
+                    return;
+                }
+                if (f.type === 'rect') return; // Handled
 
                 let text = '';
                 if (key === 'nom') text = (s.nom || '').toUpperCase();
@@ -1377,8 +1462,10 @@ async function generateBadgesWord() {
         console.error('Word gen error', err);
         showToast('Erreur génération Word', 'error');
     } finally {
-        btn.innerHTML = '<i class="ri-file-word-line"></i> Générer Badges (Word)';
-        btn.disabled = false;
+        if (btn) {
+            btn.innerHTML = '<i class="ri-file-word-line"></i> Générer Badges (Word)';
+            btn.disabled = false;
+        }
     }
 }
 
