@@ -1020,6 +1020,12 @@ async function exportImages() {
 /* ==============================================
    HELPERS
    ============================================== */
+function getInitials(prenom, nom) {
+    const p = (prenom || '').trim();
+    const n = (nom || '').trim();
+    return ((p[0] || '') + (n[0] || '')).toUpperCase();
+}
+
 function showToast(msg, type = 'info') {
     const container = document.getElementById('toastContainer');
     const el = document.createElement('div');
