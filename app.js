@@ -198,7 +198,18 @@ function subscribeToRealtime() {
             // Refresh current view if applicable
             refreshCurrentView();
         })
-        .subscribe();
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                showToast('Synchro en direct active 🟢', 'success');
+            }
+            if (status === 'CHANNEL_ERROR') {
+                showToast('Erreur synchro (Check Dashboard) 🔴', 'error');
+                console.error('Realtime channel error');
+            }
+            if (status === 'TIMED_OUT') {
+                showToast('Synchro lente... 🟠', 'warning');
+            }
+        });
 }
 
 // Helper to refresh UI without full reload
@@ -390,6 +401,10 @@ function routeTo(route, param = null) {
             // Get unique harakas from current data + defaults
             const allH = new Set([...seminaristes.map(s => s.halaqa).filter(Boolean), ...DORTOIRS_FRERES, ...DORTOIRS_SOEURS]);
             renderGroupList('halaqa', Array.from(allH));
+            break;
+        case 'badges':
+            pageTitle.innerText = 'Éditeur de Badges';
+            renderBadgeEditor();
             break;
         case 'import':
             pageTitle.innerText = 'Import / Export';
@@ -1016,6 +1031,364 @@ function showToast(msg, type = 'info') {
     setTimeout(() => el.remove(), 3000);
 }
 
-function getInitials(p, n) {
-    return (p.charAt(0) + n.charAt(0)).toUpperCase();
+/* ==============================================
+   BADGE EDITOR SYSTEM
+   ============================================== */
+
+let badgeConfig = {
+    template: null, // DataURL
+    fields: {
+        nom: { x: 50, y: 100, size: 20, color: '#000000', label: 'Nom', active: true, type: 'text' },
+        prenom: { x: 50, y: 150, size: 20, color: '#000000', label: 'Prénom', active: true, type: 'text' },
+        matricule: { x: 50, y: 200, size: 16, color: '#000000', label: 'Matricule', active: true, type: 'text' },
+        niveau: { x: 50, y: 250, size: 16, color: '#000000', label: 'Niveau', active: true, type: 'text' },
+        dortoir: { x: 50, y: 300, size: 16, color: '#000000', label: 'Dortoir', active: true, type: 'text' },
+        photo: { x: 300, y: 50, w: 100, h: 120, label: 'PHOTO', active: true, type: 'rect' }
+    }
+};
+
+// Start Editor
+function renderBadgeEditor() {
+    view.innerHTML = `
+    <div class="grid-form" style="display:grid; grid-template-columns: 300px 1fr; gap:2rem;">
+        
+        <!-- Controls -->
+        <div class="table-card" style="height:fit-content">
+            <div class="table-header"><h4>Configuration</h4></div>
+            <div style="padding:1.5rem">
+                <div class="form-group">
+                    <label class="form-label">1. Modèle (Image)</label>
+                    <input type="file" id="badgeTemplateInput" accept="image/*" class="form-control">
+                </div>
+                
+                <hr style="margin:1rem 0; border:0; border-top:1px solid #eee;">
+                
+                <div class="form-group">
+                    <label class="form-label">2. Éléments</label>
+                    <div id="badgeFieldsControl"></div>
+                </div>
+
+                <hr style="margin:1rem 0; border:0; border-top:1px solid #eee;">
+                
+                <button class="btn btn-primary" style="width:100%" onclick="generateBadgesWord()">
+                    <i class="ri-file-word-line"></i> Générer Badges (Word)
+                </button>
+                <div class="small text-muted mt-2" style="text-align:center">Génère pour tous les séminaristes</div>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="table-card" style="overflow:hidden; position:relative; background:#ddd; min-height:600px; display:flex; justify-content:center; align-items:center;">
+             <canvas id="badgeCanvas" style="background:white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); cursor:crosshair"></canvas>
+        </div>
+    </div>
+    `;
+
+    loadBadgeConfig();
+    initBadgeCanvas();
+    renderBadgeControls();
+}
+
+function renderBadgeControls() {
+    const container = document.getElementById('badgeFieldsControl');
+    container.innerHTML = Object.keys(badgeConfig.fields).map(key => {
+        const f = badgeConfig.fields[key];
+        return `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; font-size:0.9rem">
+            <label style="display:flex; align-items:center; gap:0.5rem">
+                <input type="checkbox" ${f.active ? 'checked' : ''} onchange="toggleBadgeField('${key}')"> 
+                ${f.label}
+            </label>
+            ${f.type === 'text'
+                ? `<input type="color" value="${f.color}" onchange="updateBadgeColor('${key}', this.value)" style="width:30px; height:20px; border:none; padding:0;">`
+                : '<span style="font-size:0.8rem; color:#666">Resize on canvas</span>'
+            }
+        </div>
+        `;
+    }).join('');
+}
+
+function loadBadgeConfig() {
+    const saved = localStorage.getItem('jospia_badge_config');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            badgeConfig = { ...badgeConfig, ...parsed };
+            // fields might need merging if structure changed
+            if (parsed.fields) badgeConfig.fields = { ...badgeConfig.fields, ...parsed.fields };
+        } catch (e) { }
+    }
+}
+
+function saveBadgeConfig() {
+    localStorage.setItem('jospia_badge_config', JSON.stringify(badgeConfig));
+}
+
+// Canvas Logic
+let canvas, ctx;
+let draggingKey = null;
+const CANVAS_WIDTH = 600; // Fixed working width
+const CANVAS_HEIGHT = 400; // Fixed working height (simulates landscape badge)
+
+function initBadgeCanvas() {
+    canvas = document.getElementById('badgeCanvas');
+    ctx = canvas.getContext('2d');
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+
+    // Load template event
+    document.getElementById('badgeTemplateInput').onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            badgeConfig.template = evt.target.result;
+            saveBadgeConfig();
+            drawBadgeCanvas();
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Mouse Events
+    canvas.onmousedown = (e) => {
+        const { x, y } = getMousePos(canvas, e);
+        // Find clicked field (reverse to pick top-most)
+        const keys = Object.keys(badgeConfig.fields).reverse();
+        for (let key of keys) {
+            const f = badgeConfig.fields[key];
+            if (!f.active) continue;
+
+            // Hit detection
+            if (f.type === 'text') {
+                // Approximate text box
+                const width = ctx.measureText(f.label).width;
+                const height = f.size;
+                if (x >= f.x && x <= f.x + width && y >= f.y - height && y <= f.y) {
+                    draggingKey = key;
+                    break;
+                }
+            } else if (f.type === 'rect') {
+                if (x >= f.x && x <= f.x + f.w && y >= f.y && y <= f.y + f.h) {
+                    draggingKey = key;
+                    break;
+                }
+            }
+        }
+    };
+
+    canvas.onmousemove = (e) => {
+        if (!draggingKey) return;
+        const { x, y } = getMousePos(canvas, e);
+        const f = badgeConfig.fields[draggingKey];
+
+        // Simple drag logic (top-left based)
+        // Note: Better logic would use offset but this is enough for MVP
+        f.x = x;
+        f.y = y;
+
+        drawBadgeCanvas();
+    };
+
+    canvas.onmouseup = () => {
+        if (draggingKey) {
+            saveBadgeConfig();
+            draggingKey = null;
+        }
+    };
+
+    drawBadgeCanvas();
+}
+
+function getMousePos(canvas, evt) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+    };
+}
+
+function drawBadgeCanvas() {
+    // Clear
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Template
+    if (badgeConfig.template) {
+        const img = new Image();
+        img.src = badgeConfig.template;
+        // Draw image covering canvas (or contain?) -> Fit to canvas
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } else {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ccc';
+        ctx.font = '20px sans-serif';
+        ctx.fillText('Glissez une image modèle ici ou importez-la', 50, 200);
+    }
+
+    // Draw Fields
+    Object.keys(badgeConfig.fields).forEach(key => {
+        const f = badgeConfig.fields[key];
+        if (!f.active) return;
+
+        if (f.type === 'text') {
+            ctx.fillStyle = f.color;
+            ctx.font = `bold ${f.size}px Arial`;
+            // If dragging, highlight
+            if (draggingKey === key) {
+                ctx.strokeStyle = 'blue';
+                ctx.strokeText(f.label + ' (Exemple)', f.x, f.y);
+            }
+            ctx.fillText(f.label + ' (Exemple)', f.x, f.y);
+        } else if (f.type === 'rect') {
+            // Photo placeholder
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(f.x, f.y, f.w, f.h);
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+            ctx.fillRect(f.x, f.y, f.w, f.h);
+            ctx.fillStyle = 'red';
+            ctx.font = '14px Arial';
+            ctx.fillText(f.label, f.x + 10, f.y + 20);
+
+            // Corner handle logic could go here for resize, but let's stick to drag for now
+            // To simplify: we assume fixed standard photo ratio, maybe add resize sliders later if requested
+        }
+    });
+}
+
+// Helpers for controls
+window.toggleBadgeField = (key) => {
+    badgeConfig.fields[key].active = !badgeConfig.fields[key].active;
+    saveBadgeConfig();
+    drawBadgeCanvas();
+};
+
+window.updateBadgeColor = (key, color) => {
+    badgeConfig.fields[key].color = color;
+    saveBadgeConfig();
+    drawBadgeCanvas();
+};
+
+
+/* ==============================================
+   GENERATION LOGIC (WORD)
+   ============================================== */
+async function generateBadgesWord() {
+    if (seminaristes.length === 0) return showToast('Aucun séminariste', 'warning');
+
+    const btn = event.target;
+    btn.innerHTML = '<i class="ri-loader-4-line ri-spin"></i> Génération...';
+    btn.disabled = true;
+
+    try {
+        const { Document, Packer, Paragraph, ImageRun, TextRun } = docx;
+
+        // Hidden canvas for generation
+        const genCanvas = document.createElement('canvas');
+        genCanvas.width = canvas.width;
+        genCanvas.height = canvas.height;
+        const genCtx = genCanvas.getContext('2d');
+
+        // Preload template
+        let templateImg = null;
+        if (badgeConfig.template) {
+            templateImg = await loadImage(badgeConfig.template);
+        }
+
+        const paragraphs = [];
+
+        // Loop chunks (e.g. 2 badges per page?)
+        // Let's just stack them for now
+        for (let i = 0; i < seminaristes.length; i++) {
+            const s = seminaristes[i];
+
+            // 1. Draw Background
+            genCtx.clearRect(0, 0, genCanvas.width, genCanvas.height);
+            if (templateImg) {
+                genCtx.drawImage(templateImg, 0, 0, genCanvas.width, genCanvas.height);
+            } else {
+                genCtx.fillStyle = '#fff';
+                genCtx.fillRect(0, 0, genCanvas.width, genCanvas.height);
+            }
+
+            // 2. Draw Photo
+            const fPhoto = badgeConfig.fields['photo'];
+            if (fPhoto.active && s.photo_url) {
+                try {
+                    const pImg = await loadImage(s.photo_url);
+                    // Draw photo in rect
+                    genCtx.drawImage(pImg, fPhoto.x, fPhoto.y, fPhoto.w, fPhoto.h);
+                } catch (e) {
+                    // console.warn('Photo load fail', e);
+                }
+            }
+
+            // 3. Draw Text
+            Object.keys(badgeConfig.fields).forEach(key => {
+                const f = badgeConfig.fields[key];
+                if (!f.active || f.type !== 'text') return;
+
+                let text = '';
+                if (key === 'nom') text = (s.nom || '').toUpperCase();
+                else if (key === 'prenom') text = s.prenom || '';
+                else if (key === 'matricule') text = s.matricule || '';
+                else if (key === 'niveau') text = (s.niveau || '').replace('NIVEAU ', '');
+                else if (key === 'dortoir') text = s.dortoir || '';
+
+                genCtx.fillStyle = f.color;
+                genCtx.font = `bold ${f.size}px Arial`;
+                genCtx.fillText(text, f.x, f.y);
+            });
+
+            // 4. Export to Blob
+            const blob = await new Promise(r => genCanvas.toBlob(r, 'image/jpeg', 0.9));
+            const buffer = await blob.arrayBuffer();
+
+            // 5. Add to Doc
+            paragraphs.push(
+                new Paragraph({
+                    children: [
+                        new ImageRun({
+                            data: buffer,
+                            transformation: { width: 500, height: 333 } // Scale to fit page width
+                        })
+                    ],
+                    spacing: { after: 200 } // Spacing between badges
+                })
+            );
+        }
+
+        // Create Doc
+        const doc = new Document({
+            sections: [{
+                children: paragraphs
+            }]
+        });
+
+        // Save
+        const docBlob = await Packer.toBlob(doc);
+        saveAs(docBlob, "badges_jospia.docx");
+
+        showToast('Badges générés avec succès !', 'success');
+
+    } catch (err) {
+        console.error('Word gen error', err);
+        showToast('Erreur génération Word', 'error');
+    } finally {
+        btn.innerHTML = '<i class="ri-file-word-line"></i> Générer Badges (Word)';
+        btn.disabled = false;
+    }
+}
+
+// Helper: Load Image Promise
+function loadImage(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous"; // Crucial for external images
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+    });
 }
