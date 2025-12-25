@@ -40,6 +40,7 @@ async function initApp() {
         showToast('Mode Local (Pas de Supabase configuré)', 'warning');
     } else {
         showToast('Connecté à Supabase', 'success');
+        subscribeToRealtime();
     }
 
     // Bind sidebar clicks
@@ -164,6 +165,72 @@ async function deleteAllData() {
             console.error('Delete ALL error', err);
             showToast('Erreur lors de la suppression totale', 'error');
         }
+    }
+}
+
+function subscribeToRealtime() {
+    if (!supabaseClient) return;
+
+    supabaseClient
+        .channel('public:seminaristes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'seminaristes' }, (payload) => {
+            console.log('Realtime Change:', payload);
+            const { eventType, new: newRecord, old: oldRecord } = payload;
+
+            if (eventType === 'INSERT') {
+                // Check uniqueness to avoid duplicates if this client triggered the insert
+                if (!seminaristes.find(s => s.matricule === newRecord.matricule)) {
+                    seminaristes.push(newRecord);
+                    showToast(`Nouvelle entrée: ${newRecord.prenom} ${newRecord.nom}`, 'info');
+                }
+            } else if (eventType === 'UPDATE') {
+                const index = seminaristes.findIndex(s => s.matricule === newRecord.matricule);
+                if (index !== -1) {
+                    seminaristes[index] = newRecord;
+                } else {
+                    // Falls back to adding if for some reason we didn't have it
+                    seminaristes.push(newRecord);
+                }
+            } else if (eventType === 'DELETE') {
+                seminaristes = seminaristes.filter(s => s.matricule !== oldRecord.matricule);
+            }
+
+            // Refresh current view if applicable
+            refreshCurrentView();
+        })
+        .subscribe();
+}
+
+// Helper to refresh UI without full reload
+function refreshCurrentView() {
+    // Determine current logical route based on UI state or just re-render last known
+    // Simple heuristic: look at active nav link
+    const activeLink = document.querySelector('.nav-link.active');
+    if (activeLink) {
+        const route = activeLink.dataset.route;
+        // Re-trigger routing to refresh data display
+        if (route === 'dashboard') renderDashboard();
+        else if (route === 'all') renderTable(seminaristes);
+        else if (route === 'search') {
+            // Re-trigger search if input has value
+            const term = document.getElementById('searchInput')?.value;
+            if (term && term.length >= 2) {
+                const matches = seminaristes.filter(s =>
+                    (s.nom && s.nom.toLowerCase().includes(term.toLowerCase())) ||
+                    (s.prenom && s.prenom.toLowerCase().includes(term.toLowerCase())) ||
+                    (s.matricule && s.matricule.toLowerCase().includes(term.toLowerCase()))
+                );
+                document.getElementById('searchResults').innerHTML = generateTableHTML(matches);
+            }
+        }
+        else if (route === 'levels') renderLevelsByGenre();
+        else if (route === 'dortoirs') renderGroupList('dortoir', [...DORTOIRS_FRERES, ...DORTOIRS_SOEURS]);
+        else if (route === 'harakas') {
+            const allH = new Set([...seminaristes.map(s => s.halaqa).filter(Boolean), ...DORTOIRS_FRERES, ...DORTOIRS_SOEURS]);
+            renderGroupList('halaqa', Array.from(allH));
+        }
+        // 'add'/'edit' forms might be disrupted by auto-refresh, so we skip or handle carefully. 
+        // For now, we don't auto-refresh forms to avoid wiping user input.
     }
 }
 
