@@ -45,7 +45,14 @@ async function initApp() {
 
     await loadData();
     updateUIForRole();
-    routeTo('dashboard');
+
+    // Route based on role
+    if (currentUserRole === 'admin') {
+        routeTo('dashboard');
+    } else {
+        // Regular users go directly to add page
+        routeTo('add');
+    }
 
     if (USE_LOCAL_STORAGE) {
         showToast('Mode Local (Pas de Supabase configuré)', 'warning');
@@ -1150,6 +1157,22 @@ function updateUIForRole() {
             el.style.display = '';
         }
     });
+
+    // Hide entire nav groups for non-admin users (except the group containing 'Nouveau')
+    if (currentUserRole !== 'admin') {
+        document.querySelectorAll('.nav-group').forEach((group, index) => {
+            // Keep only the first nav-group (Menu) which contains 'Nouveau'
+            // Hide 'Filtres' (index 1) and 'Données' (index 2)
+            if (index === 1 || index === 2) {
+                group.style.display = 'none';
+            }
+        });
+    } else {
+        // Show all groups for admin
+        document.querySelectorAll('.nav-group').forEach(group => {
+            group.style.display = '';
+        });
+    }
 
     // Update user profile display
     const userProfile = document.querySelector('.user-profile span');
