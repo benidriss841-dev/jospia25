@@ -21,6 +21,10 @@ const GROUPE_HARAKAS_KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const USE_LOCAL_STORAGE = (!SUPABASE_URL || SUPABASE_URL.includes('YOUR_'));
 const DB_KEY = 'jospia_v2_local_db';
 
+// Authentication
+const ADMIN_PASSWORD = 'benfou2007';
+let currentUserRole = sessionStorage.getItem('userRole') || null; // 'admin' or 'user'
+
 /* ==============================================
    INIT
    ============================================== */
@@ -33,7 +37,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
+    // Check authentication first
+    if (!currentUserRole) {
+        showLoginModal();
+        return;
+    }
+
     await loadData();
+    updateUIForRole();
     routeTo('dashboard');
 
     if (USE_LOCAL_STORAGE) {
@@ -48,6 +59,13 @@ async function initApp() {
         el.addEventListener('click', (e) => {
             e.preventDefault();
             const route = el.dataset.route;
+
+            // Check if route requires admin
+            if (el.dataset.adminOnly === 'true' && currentUserRole !== 'admin') {
+                showToast('Accès réservé aux administrateurs', 'error');
+                return;
+            }
+
             // Handle active state
             document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
             el.classList.add('active');
@@ -389,14 +407,29 @@ function routeTo(route, param = null) {
             else showToast('Introuvable', 'error');
             break;
         case 'levels':
+            if (currentUserRole !== 'admin') {
+                showToast('Accès réservé aux administrateurs', 'error');
+                routeTo('dashboard');
+                return;
+            }
             pageTitle.innerText = 'Niveaux par Genre';
             renderLevelsByGenre();
             break;
         case 'dortoirs':
+            if (currentUserRole !== 'admin') {
+                showToast('Accès réservé aux administrateurs', 'error');
+                routeTo('dashboard');
+                return;
+            }
             pageTitle.innerText = 'Dortoirs';
             renderGroupList('dortoir', [...DORTOIRS_FRERES, ...DORTOIRS_SOEURS]);
             break;
         case 'harakas':
+            if (currentUserRole !== 'admin') {
+                showToast('Accès réservé aux administrateurs', 'error');
+                routeTo('dashboard');
+                return;
+            }
             pageTitle.innerText = 'Harakas';
             // Get unique harakas from current data + defaults
             const allH = new Set([...seminaristes.map(s => s.halaqa).filter(Boolean), ...DORTOIRS_FRERES, ...DORTOIRS_SOEURS]);
@@ -441,26 +474,33 @@ function renderDashboard() {
         if (levels[s.niveau] !== undefined) levels[s.niveau]++;
     });
 
-    const html = `
-    <div class="grid-dashboard">
-      <div class="stats-card highlight">
-        <span class="label">Total Inscrits</span>
-        <span class="value">${total}</span>
-      </div>
-      <div class="stats-card">
-        <span class="label">Primaire</span>
-        <span class="value">${levels['NIVEAU PRIMAIRE']}</span>
-      </div>
-      <div class="stats-card">
-        <span class="label">Secondaire</span>
-        <span class="value">${levels['NIVEAU SECONDAIRE']}</span>
-      </div>
-      <div class="stats-card">
-        <span class="label">Universitaire</span>
-        <span class="value">${levels['NIVEAU UNIVERSITAIRE']}</span>
-      </div>
-    </div>
-    
+    let html = '';
+
+    // Statistics cards - Admin only
+    if (currentUserRole === 'admin') {
+        html += `
+        <div class="grid-dashboard">
+          <div class="stats-card highlight">
+            <span class="label">Total Inscrits</span>
+            <span class="value">${total}</span>
+          </div>
+          <div class="stats-card">
+            <span class="label">Primaire</span>
+            <span class="value">${levels['NIVEAU PRIMAIRE']}</span>
+          </div>
+          <div class="stats-card">
+            <span class="label">Secondaire</span>
+            <span class="value">${levels['NIVEAU SECONDAIRE']}</span>
+          </div>
+          <div class="stats-card">
+            <span class="label">Universitaire</span>
+            <span class="value">${levels['NIVEAU UNIVERSITAIRE']}</span>
+          </div>
+        </div>
+        `;
+    }
+
+    html += `
     <div class="table-card">
       <div class="table-header">
         <h4>Derniers ajouts</h4>
@@ -468,19 +508,25 @@ function renderDashboard() {
       </div>
       ${generateTableHTML(seminaristes.slice(-5).reverse())}
     </div>
+    `;
 
-    <div class="table-card" style="margin-top: 1rem; border-color: var(--danger);">
-        <div class="table-header" style="background-color: #fee2e2;">
-            <h4 style="color: var(--danger);">Zone de Danger</h4>
+    // Delete All button - Admin only
+    if (currentUserRole === 'admin') {
+        html += `
+        <div class="table-card" style="margin-top: 1rem; border-color: var(--danger);">
+            <div class="table-header" style="background-color: #fee2e2;">
+                <h4 style="color: var(--danger);">Zone de Danger</h4>
+            </div>
+            <div style="padding: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+                <p style="margin: 0; color: var(--danger);">Supprimer toutes les données de l'application.</p>
+                <button class="btn btn-outline" style="color: var(--danger); border-color: var(--danger);" onclick="deleteAllData()">
+                    <i class="ri-delete-bin-line"></i> Tout Supprimer
+                </button>
+            </div>
         </div>
-        <div style="padding: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
-            <p style="margin: 0; color: var(--danger);">Supprimer toutes les données de l'application.</p>
-            <button class="btn btn-outline" style="color: var(--danger); border-color: var(--danger);" onclick="deleteAllData()">
-                <i class="ri-delete-bin-line"></i> Tout Supprimer
-            </button>
-        </div>
-    </div>
-  `;
+        `;
+    }
+
     view.innerHTML = html;
 }
 
@@ -1016,6 +1062,113 @@ async function exportImages() {
 }
 
 
+
+/* ==============================================
+   AUTHENTICATION
+   ============================================== */
+function showLoginModal() {
+    const modal = document.createElement('div');
+    modal.id = 'loginModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+
+    modal.innerHTML = `
+        <div style="background:white;padding:2rem;border-radius:12px;max-width:400px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+            <h2 style="margin:0 0 1.5rem 0;color:#1e293b;text-align:center;">JOSPIA - Connexion</h2>
+            <form id="loginForm">
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;margin-bottom:0.5rem;color:#475569;font-weight:500;">Rôle</label>
+                    <select id="roleSelect" class="form-select" style="width:100%;padding:0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:1rem;">
+                        <option value="user">Utilisateur</option>
+                        <option value="admin">Administrateur</option>
+                    </select>
+                </div>
+                <div id="passwordField" style="margin-bottom:1.5rem;display:none;">
+                    <label style="display:block;margin-bottom:0.5rem;color:#475569;font-weight:500;">Mot de passe</label>
+                    <input type="password" id="passwordInput" class="form-control" placeholder="Entrez le mot de passe admin" style="width:100%;padding:0.75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:1rem;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;padding:0.75rem;font-size:1rem;">Se connecter</button>
+            </form>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const roleSelect = document.getElementById('roleSelect');
+    const passwordField = document.getElementById('passwordField');
+    const passwordInput = document.getElementById('passwordInput');
+
+    roleSelect.addEventListener('change', () => {
+        if (roleSelect.value === 'admin') {
+            passwordField.style.display = 'block';
+            passwordInput.required = true;
+        } else {
+            passwordField.style.display = 'none';
+            passwordInput.required = false;
+            passwordInput.value = '';
+        }
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const role = roleSelect.value;
+        const password = passwordInput.value;
+
+        if (role === 'admin') {
+            if (password === ADMIN_PASSWORD) {
+                currentUserRole = 'admin';
+                sessionStorage.setItem('userRole', 'admin');
+                modal.remove();
+                showToast('Connecté en tant qu\'administrateur', 'success');
+                initApp();
+            } else {
+                showToast('Mot de passe incorrect', 'error');
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        } else {
+            currentUserRole = 'user';
+            sessionStorage.setItem('userRole', 'user');
+            modal.remove();
+            showToast('Connecté en tant qu\'utilisateur', 'success');
+            initApp();
+        }
+    });
+}
+
+function logout() {
+    currentUserRole = null;
+    sessionStorage.removeItem('userRole');
+    location.reload();
+}
+
+function updateUIForRole() {
+    // Hide admin-only menu items for non-admin users
+    document.querySelectorAll('[data-admin-only="true"]').forEach(el => {
+        if (currentUserRole !== 'admin') {
+            el.style.display = 'none';
+        } else {
+            el.style.display = '';
+        }
+    });
+
+    // Update user profile display
+    const userProfile = document.querySelector('.user-profile span');
+    if (userProfile) {
+        userProfile.textContent = currentUserRole === 'admin' ? 'Admin' : 'Utilisateur';
+    }
+
+    // Add logout button if not exists
+    const avatar = document.querySelector('.avatar');
+    if (avatar && !avatar.onclick) {
+        avatar.style.cursor = 'pointer';
+        avatar.title = 'Cliquez pour vous déconnecter';
+        avatar.onclick = () => {
+            if (confirm('Voulez-vous vous déconnecter ?')) {
+                logout();
+            }
+        };
+    }
+}
 
 /* ==============================================
    HELPERS
