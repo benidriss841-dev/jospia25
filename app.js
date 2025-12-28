@@ -669,6 +669,7 @@ function renderForm(data = null) {
 
           <div style="display:flex; gap:1rem; justify-content:flex-end">
             <button type="button" class="btn btn-outline" onclick="routeTo('all')">Annuler</button>
+            ${isEdit ? `<button type="button" class="btn btn-accent" onclick="generateReceiptPDF(${JSON.stringify(data).replace(/"/g, '&quot;')})"><i class="ri-file-pdf-line"></i> Télécharger Reçu</button>` : ''}
             ${isEdit ? `<button type="button" class="btn btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="handleDelete('${data.matricule}')">Supprimer</button>` : ''}
             <button type="submit" class="btn btn-primary">${isEdit ? 'Mettre à jour' : 'Enregistrer'}</button>
           </div>
@@ -803,6 +804,25 @@ function renderForm(data = null) {
 
             await saveData(payload, isEdit);
             showToast('Enregistré avec succès', 'success');
+
+            // Propose to download receipt after saving
+            setTimeout(async () => {
+                if (confirm('✅ Séminariste enregistré avec succès!\n\nVoulez-vous télécharger le reçu d\'inscription maintenant ?')) {
+                    try {
+                        // Ensure we have the complete data with matricule
+                        const savedData = isEdit ? payload : await getDataByMatricule(payload.matricule);
+                        if (savedData && typeof generateReceiptPDF === 'function') {
+                            await generateReceiptPDF(savedData);
+                        } else {
+                            showToast('Impossible de générer le reçu', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error generating receipt:', err);
+                        showToast('Erreur lors de la génération du reçu', 'error');
+                    }
+                }
+            }, 500);
+
             routeTo('all');
         } catch (err) {
             console.error(err);
@@ -891,16 +911,19 @@ function renderLevelsByGenre() {
     });
 
     const listHtml = groups.map(g => `
-    <a href="#" class="list-item" onclick='routeTo("filtered_multi", { filters: ${JSON.stringify(g.filters)}, title: "${g.title}" })'>
-        <div style="display:flex; align-items:center; gap:0.5rem">
+    <div class="list-item" style="display:flex; justify-content:space-between; align-items:center; padding:1rem;">
+        <a href="#" style="flex:1; display:flex; align-items:center; gap:0.5rem; text-decoration:none; color:inherit;" onclick='routeTo("filtered_multi", { filters: ${JSON.stringify(g.filters)}, title: "${g.title}" })'>
             <i class="${g.icon}"></i>
             <span>${g.title}</span>
-        </div>
-      <span class="badge">${g.count}</span>
-    </a>
+            <span class="badge">${g.count}</span>
+        </a>
+        <button class="btn btn-outline btn-sm" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title}')" style="margin-left:1rem;">
+            <i class="ri-file-pdf-line"></i> Reçus
+        </button>
+    </div>
   `).join('');
 
-    view.innerHTML = `<div class="list-group" style="max-width:600px">${listHtml}</div>`;
+    view.innerHTML = `<div class="list-group" style="max-width:800px">${listHtml}</div>`;
 }
 
 // 6. Import
@@ -939,6 +962,21 @@ function renderImportExport() {
             </button>
             <button class="btn btn-outline" onclick="exportImagesByLevel('NIVEAU UNIVERSITAIRE')">
               <i class="ri-download-line"></i> Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE' && s.photo_url).length})
+            </button>
+          </div>
+          
+          <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
+          
+          <p class="form-label" style="margin-bottom:1rem">Télécharger les reçus PDF par niveau.</p>
+          <div style="display:flex; flex-direction:column; gap:0.5rem;">
+            <button class="btn btn-outline" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE'), 'Primaire')">
+              <i class="ri-file-pdf-line"></i> Reçus Primaire (${seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE').length})
+            </button>
+            <button class="btn btn-outline" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE'), 'Secondaire')">
+              <i class="ri-file-pdf-line"></i> Reçus Secondaire (${seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE').length})
+            </button>
+            <button class="btn btn-outline" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE'), 'Universitaire')">
+              <i class="ri-file-pdf-line"></i> Reçus Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE').length})
             </button>
           </div>
         </div>
