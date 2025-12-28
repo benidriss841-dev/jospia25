@@ -926,6 +926,21 @@ function renderImportExport() {
           
           <p class="form-label" style="margin-bottom:1rem">Télécharger les photos (pour les badges).</p>
           <button class="btn btn-primary" onclick="exportImages()">Exporter Photos (.zip)</button>
+          
+          <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
+          
+          <p class="form-label" style="margin-bottom:1rem">Télécharger les photos par niveau.</p>
+          <div style="display:flex; flex-direction:column; gap:0.5rem;">
+            <button class="btn btn-outline" onclick="exportImagesByLevel('NIVEAU PRIMAIRE')">
+              <i class="ri-download-line"></i> Primaire (${seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE' && s.photo_url).length})
+            </button>
+            <button class="btn btn-outline" onclick="exportImagesByLevel('NIVEAU SECONDAIRE')">
+              <i class="ri-download-line"></i> Secondaire (${seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE' && s.photo_url).length})
+            </button>
+            <button class="btn btn-outline" onclick="exportImagesByLevel('NIVEAU UNIVERSITAIRE')">
+              <i class="ri-download-line"></i> Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE' && s.photo_url).length})
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1068,6 +1083,66 @@ async function exportImages() {
     }
 }
 
+async function exportImagesByLevel(niveau) {
+    if (!seminaristes || seminaristes.length === 0) return showToast('Aucun séminariste', 'warning');
+
+    // Filter by level
+    const byLevel = seminaristes.filter(s => s.niveau === niveau && s.photo_url);
+    if (byLevel.length === 0) return showToast(`Aucune photo trouvée pour ${niveau}`, 'warning');
+
+    const zip = new JSZip();
+    let count = 0;
+    const btn = event.target; // Get button if possible
+    const oldText = btn.innerText;
+    btn.innerText = 'Préparation...';
+    btn.disabled = true;
+
+    try {
+        const promises = byLevel.map(async (s) => {
+            try {
+                // If it's a data URL (base64)
+                if (s.photo_url.startsWith('data:')) {
+                    const base64Data = s.photo_url.split(',')[1];
+                    zip.file(`${s.matricule}.jpg`, base64Data, { base64: true });
+                    count++;
+                } else {
+                    // It's a remote URL
+                    const response = await fetch(s.photo_url);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        zip.file(`${s.matricule}.jpg`, blob);
+                        count++;
+                    }
+                }
+            } catch (err) {
+                console.warn(`Failed to load image for ${s.matricule}`, err);
+            }
+        });
+
+        await Promise.all(promises);
+
+        if (count === 0) throw new Error('Aucune image n\'a pu être traitée');
+
+        const content = await zip.generateAsync({ type: "blob" });
+        const url = window.URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        // Create filename based on level
+        const levelName = niveau.replace('NIVEAU ', '').toLowerCase();
+        a.download = `photos_${levelName}.zip`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        showToast(`${count} photos exportées pour ${niveau}`, 'success');
+
+    } catch (err) {
+        console.error('Export zip failed', err);
+        showToast('Erreur lors de l\'export des photos', 'error');
+    } finally {
+        btn.innerText = oldText;
+        btn.disabled = false;
+    }
+}
 
 
 /* ==============================================
