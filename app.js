@@ -929,9 +929,14 @@ function renderLevelsByGenre() {
             <span>${g.title}</span>
             <span class="badge">${g.count}</span>
         </a>
-        <button class="btn btn-outline btn-sm" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title}')" style="margin-left:1rem;">
-            <i class="ri-file-pdf-line"></i> Reçus
-        </button>
+        <div style="display:flex; gap:0.5rem; margin-left:1rem;">
+            <button class="btn btn-outline btn-sm" onclick="exportExcel(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}.xlsx')">
+                <i class="ri-file-excel-line"></i> Excel
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title}')">
+                <i class="ri-file-pdf-line"></i> Reçus
+            </button>
+        </div>
     </div>
   `).join('');
 
@@ -974,6 +979,21 @@ function renderImportExport() {
             </button>
             <button class="btn btn-outline" onclick="exportImagesByLevel('NIVEAU UNIVERSITAIRE')">
               <i class="ri-download-line"></i> Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE' && s.photo_url).length})
+            </button>
+          </div>
+          
+          <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
+          
+          <p class="form-label" style="margin-bottom:1rem">Télécharger les listes Excel par niveau.</p>
+          <div style="display:flex; flex-direction:column; gap:0.5rem;">
+            <button class="btn btn-outline" onclick="exportExcel(seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE'), 'primaire.xlsx')">
+              <i class="ri-file-excel-line"></i> Liste Primaire (${seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE').length})
+            </button>
+            <button class="btn btn-outline" onclick="exportExcel(seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE'), 'secondaire.xlsx')">
+              <i class="ri-file-excel-line"></i> Liste Secondaire (${seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE').length})
+            </button>
+            <button class="btn btn-outline" onclick="exportExcel(seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE'), 'universitaire.xlsx')">
+              <i class="ri-file-excel-line"></i> Liste Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE').length})
             </button>
           </div>
           
@@ -1067,12 +1087,12 @@ function renderImportExport() {
     };
 }
 
-function exportExcel(data) {
+function exportExcel(data, filename = "seminaristes_export.xlsx") {
     if (!data || data.length === 0) return showToast('Rien à exporter', 'warning');
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Export");
-    XLSX.writeFile(wb, "seminaristes_export.xlsx");
+    XLSX.writeFile(wb, filename);
 }
 
 async function exportImages() {
