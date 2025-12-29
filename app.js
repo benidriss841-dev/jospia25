@@ -960,6 +960,26 @@ function renderImportExport() {
       </div>
       
       <div class="table-card">
+        <div class="table-header"><h4><i class="ri-image-add-line"></i> Importer Photos</h4></div>
+        <div style="padding:2rem">
+          <p class="form-label" style="margin-bottom:1rem">
+            Sélectionnez plusieurs photos. Le nom de chaque fichier doit correspondre au <strong>matricule</strong> du séminariste.<br>
+            <small style="color: var(--muted)">Ex: 25-JOS001.jpg, 25-JOS002.png, etc.</small>
+          </p>
+          <input type="file" id="importPhotos" accept="image/*" multiple class="form-control mb-3">
+          <button class="btn btn-primary" id="btnImportPhotos">
+            <i class="ri-upload-2-line"></i> Importer les photos
+          </button>
+          <div id="photoImportProgress" style="margin-top:1rem; display:none;">
+            <div style="background:#e5e7eb; border-radius:4px; height:8px; overflow:hidden;">
+              <div id="photoProgressBar" style="background:var(--primary); height:100%; width:0%; transition: width 0.3s;"></div>
+            </div>
+            <p id="photoProgressText" style="margin-top:0.5rem; font-size:0.875rem; color:var(--muted)"></p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="table-card">
         <div class="table-header"><h4>Exporter</h4></div>
         <div style="padding:2rem">
           <p class="form-label" style="margin-bottom:1rem">Télécharger la liste complète.</p>
@@ -1102,6 +1122,74 @@ function renderImportExport() {
             }
         };
         reader.readAsArrayBuffer(f);
+    };
+
+
+    // Photo Import Handler
+    document.getElementById('btnImportPhotos').onclick = async () => {
+        const files = document.getElementById('importPhotos').files;
+        if (!files || files.length === 0) return showToast('Sélectionnez des photos', 'warning');
+
+        const progressDiv = document.getElementById('photoImportProgress');
+        const progressBar = document.getElementById('photoProgressBar');
+        const progressText = document.getElementById('photoProgressText');
+        const btn = document.getElementById('btnImportPhotos');
+
+        progressDiv.style.display = 'block';
+        btn.disabled = true;
+
+        let successCount = 0;
+        let infoLog = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const name = file.name; // e.g., "25-JOS001.jpg"
+            const matricule = name.split('.')[0]; // "25-JOS001"
+
+            // Update UI
+            const percent = Math.round(((i) / files.length) * 100);
+            progressBar.style.width = `${percent}%`;
+            progressText.innerText = `Traitement : ${name} (${i + 1}/${files.length})`;
+
+            // Find Seminariste
+            const seminariste = seminaristes.find(s => s.matricule === matricule);
+
+            if (seminariste) {
+                try {
+                    // Upload logic
+                    const url = await uploadImage(file, matricule);
+                    if (url) {
+                        seminariste.photo_url = url;
+                        await saveData(seminariste, true); // true = update existing
+                        successCount++;
+                    } else {
+                        infoLog.push(`Échec upload: ${name}`);
+                    }
+                } catch (e) {
+                    console.error(e);
+                    infoLog.push(`Erreur sauvegarde: ${name}`);
+                }
+            } else {
+                infoLog.push(`Introuvable: ${matricule}`);
+            }
+        }
+
+        // Final UI update
+        progressBar.style.width = '100%';
+        progressText.innerText = 'Terminé.';
+        btn.disabled = false;
+
+        if (successCount > 0) {
+            showToast(`${successCount} photos importées avec succès`, 'success');
+            // Refresh cache/UI if needed
+            await loadData();
+        }
+
+        if (infoLog.length > 0) {
+            // Show errors in alert or console for now
+            console.warn('Import Photos Report:', infoLog);
+            alert(`Rapport d'importation:\n\nSuccès: ${successCount}\nNon traités: ${infoLog.length}\n\nDétails:\n${infoLog.slice(0, 10).join('\n')}${infoLog.length > 10 ? '\n...' : ''}`);
+        }
     };
 }
 
