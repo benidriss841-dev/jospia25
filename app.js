@@ -1282,19 +1282,27 @@ async function exportWord(data, filename = "seminaristes.docx") {
             new docx.TableRow({
                 children: [
                     new docx.TableCell({
-                        children: [new docx.Paragraph({ text: "Matricule", bold: true })],
+                        children: [new docx.Paragraph({
+                            children: [new docx.TextRun({ text: "Matricule", bold: true, color: "FFFFFF" })]
+                        })],
                         shading: { fill: "3B82F6" },
                     }),
                     new docx.TableCell({
-                        children: [new docx.Paragraph({ text: "Nom", bold: true })],
+                        children: [new docx.Paragraph({
+                            children: [new docx.TextRun({ text: "Nom", bold: true, color: "FFFFFF" })]
+                        })],
                         shading: { fill: "3B82F6" },
                     }),
                     new docx.TableCell({
-                        children: [new docx.Paragraph({ text: "Prénom", bold: true })],
+                        children: [new docx.Paragraph({
+                            children: [new docx.TextRun({ text: "Prénom", bold: true, color: "FFFFFF" })]
+                        })],
                         shading: { fill: "3B82F6" },
                     }),
                     new docx.TableCell({
-                        children: [new docx.Paragraph({ text: "Photo", bold: true })],
+                        children: [new docx.Paragraph({
+                            children: [new docx.TextRun({ text: "Photo", bold: true, color: "FFFFFF" })]
+                        })],
                         shading: { fill: "3B82F6" },
                     }),
                 ],
@@ -1308,17 +1316,17 @@ async function exportWord(data, filename = "seminaristes.docx") {
 
             // Matricule
             cells.push(new docx.TableCell({
-                children: [new docx.Paragraph(s.matricule || '')],
+                children: [new docx.Paragraph({ text: s.matricule || '' })],
             }));
 
             // Nom
             cells.push(new docx.TableCell({
-                children: [new docx.Paragraph(s.nom || '')],
+                children: [new docx.Paragraph({ text: s.nom || '' })],
             }));
 
             // Prénom
             cells.push(new docx.TableCell({
-                children: [new docx.Paragraph(s.prenom || '')],
+                children: [new docx.Paragraph({ text: s.prenom || '' })],
             }));
 
             // Photo
@@ -1343,18 +1351,18 @@ async function exportWord(data, filename = "seminaristes.docx") {
                         }));
                     } else {
                         cells.push(new docx.TableCell({
-                            children: [new docx.Paragraph('(Photo indisponible)')],
+                            children: [new docx.Paragraph({ text: '(Photo indisponible)' })],
                         }));
                     }
                 } catch (err) {
                     console.warn('Error adding image:', err);
                     cells.push(new docx.TableCell({
-                        children: [new docx.Paragraph('(Erreur photo)')],
+                        children: [new docx.Paragraph({ text: '(Erreur photo)' })],
                     }));
                 }
             } else {
                 cells.push(new docx.TableCell({
-                    children: [new docx.Paragraph('(Aucune photo)')],
+                    children: [new docx.Paragraph({ text: '(Aucune photo)' })],
                 }));
             }
 
