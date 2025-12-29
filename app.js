@@ -672,8 +672,16 @@ function renderForm(data = null) {
             </div>
 
             <div id="preview" style="margin-top:0.5rem">
-              ${data?.photo_url ? `<img src="${data.photo_url}" style="height:60px;border-radius:4px">` : ''}
+              ${data?.photo_url ? `
+                <div style="display:flex; align-items:center; gap:1rem;">
+                    <img src="${data.photo_url}" style="height:60px;border-radius:4px; border:1px solid var(--border)">
+                    <button type="button" class="btn btn-outline btn-sm" style="color:var(--danger); border-color:var(--danger)" id="btnDeletePhoto">
+                        <i class="ri-delete-bin-line"></i> Supprimer photo
+                    </button>
+                </div>
+              ` : ''}
             </div>
+            <input type="hidden" id="f_existing_photo" value="${data?.photo_url || ''}">
           </div>
           
           <hr style="border:0; border-top:1px solid var(--border); margin: 2rem 0;">
@@ -689,6 +697,17 @@ function renderForm(data = null) {
     </div>
   `;
     view.innerHTML = h;
+
+    // Delete Photo Handler
+    const btnDelPhoto = document.getElementById('btnDeletePhoto');
+    if (btnDelPhoto) {
+        btnDelPhoto.onclick = () => {
+            if (confirm('Voulez-vous vraiment supprimer la photo actuelle ? (Nécessite de sauvegarder ensuite)')) {
+                document.getElementById('preview').innerHTML = '';
+                document.getElementById('f_existing_photo').value = '';
+            }
+        };
+    }
 
     // Camera variables
     let stream = null;
@@ -780,7 +799,8 @@ function renderForm(data = null) {
             const fileInput = document.getElementById('f_photo').files[0];
             const fileToUpload = capturedFile || fileInput;
 
-            let photoUrl = data?.photo_url || '';
+            // Use the hidden field value (which might have been cleared by delete button)
+            let photoUrl = document.getElementById('f_existing_photo').value;
 
             if (fileToUpload) {
                 const matricule = data?.matricule || null;
