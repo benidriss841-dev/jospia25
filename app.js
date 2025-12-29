@@ -325,7 +325,7 @@ function ensureDerivedFields(s) {
     const note = parseFloat(s.note);
     s.niveau = 'NIVEAU PRIMAIRE'; // default
     if (!isNaN(note)) {
-        if (note > 11) s.niveau = 'NIVEAU UNIVERSITAIRE';
+        if (note > 10) s.niveau = 'NIVEAU UNIVERSITAIRE';
         else if (note > 6) s.niveau = 'NIVEAU SECONDAIRE';
     }
 
