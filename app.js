@@ -84,9 +84,6 @@ async function initApp() {
 /* ==============================================
    DATA LAYER (Supabase + LocalStorage Fallback)
    ============================================== */
-/* ==============================================
-   DATA LAYER (Supabase + LocalStorage Fallback)
-   ============================================== */
 async function loadData() {
     if (USE_LOCAL_STORAGE) {
         const stored = localStorage.getItem(DB_KEY);
@@ -107,6 +104,8 @@ async function loadData() {
             if (!err.code) showToast('Erreur chargement données', 'error');
         }
     }
+    // Enrich with photo URLs based on matricule
+    seminaristes = seminaristes.map(s => ({ ...s, photo_url: s.photo_url || getPhotoUrl(s.matricule) }));
 }
 
 async function saveData(newItem, isUpdate = false) {
@@ -326,8 +325,8 @@ function ensureDerivedFields(s) {
     const note = parseFloat(s.note);
     s.niveau = 'NIVEAU PRIMAIRE'; // default
     if (!isNaN(note)) {
-        if (note > 14) s.niveau = 'NIVEAU UNIVERSITAIRE';
-        else if (note > 9) s.niveau = 'NIVEAU SECONDAIRE';
+        if (note > 12) s.niveau = 'NIVEAU UNIVERSITAIRE';
+        else if (note > 6) s.niveau = 'NIVEAU SECONDAIRE';
     }
 
     // 4. Dortoir / Halaqa automation (only if missing)
@@ -348,7 +347,7 @@ function ensureDerivedFields(s) {
     return s;
 }
 
-async function uploadImage(file) {
+async function uploadImage(file, matricule) {
     if (!file) return null;
 
     // Local fallback
@@ -356,6 +355,10 @@ async function uploadImage(file) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        // Force deterministic public_id based on matricule if provided
+        if (matricule) {
+            formData.append('public_id', matricule);
+        }
 
         try {
             const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
@@ -377,6 +380,14 @@ async function uploadImage(file) {
             reader.readAsDataURL(file);
         });
     }
+}
+
+// Helper to get photo URL based on matricule
+// Helper to get photo URL based on matricule
+function getPhotoUrl(matricule) {
+    if (!matricule) return '';
+    // Default to local folder which user just populated
+    return `photos/${matricule}.jpg`;
 }
 
 
@@ -772,7 +783,8 @@ function renderForm(data = null) {
             let photoUrl = data?.photo_url || '';
 
             if (fileToUpload) {
-                const uploaded = await uploadImage(fileToUpload);
+                const matricule = data?.matricule || null;
+                const uploaded = await uploadImage(fileToUpload, matricule);
                 if (uploaded) photoUrl = uploaded;
             }
 

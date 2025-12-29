@@ -168,7 +168,10 @@ async function loadImageAsDataURL(url) {
         } else {
             // Remote URL - fetch and convert
             fetch(url)
-                .then(response => response.blob())
+                .then(response => {
+                    if (!response.ok) throw new Error('Image load failed: ' + response.statusText);
+                    return response.blob();
+                })
                 .then(blob => {
                     const reader = new FileReader();
                     reader.onloadend = () => resolve(reader.result);
