@@ -325,7 +325,7 @@ function ensureDerivedFields(s) {
     const note = parseFloat(s.note);
     s.niveau = 'NIVEAU PRIMAIRE'; // default
     if (!isNaN(note)) {
-        if (note > 12) s.niveau = 'NIVEAU UNIVERSITAIRE';
+        if (note > 11) s.niveau = 'NIVEAU UNIVERSITAIRE';
         else if (note > 6) s.niveau = 'NIVEAU SECONDAIRE';
     }
 
@@ -933,6 +933,9 @@ function renderLevelsByGenre() {
             <button class="btn btn-outline btn-sm" onclick="exportExcel(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}.xlsx')">
                 <i class="ri-file-excel-line"></i> Excel
             </button>
+            <button class="btn btn-outline btn-sm" onclick="exportWord(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}.docx')">
+                <i class="ri-file-word-line"></i> Word
+            </button>
             <button class="btn btn-outline btn-sm" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title}')">
                 <i class="ri-file-pdf-line"></i> Reçus
             </button>
@@ -994,6 +997,21 @@ function renderImportExport() {
             </button>
             <button class="btn btn-outline" onclick="exportExcel(seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE'), 'universitaire.xlsx')">
               <i class="ri-file-excel-line"></i> Liste Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE').length})
+            </button>
+          </div>
+          
+          <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
+          
+          <p class="form-label" style="margin-bottom:1rem">Télécharger les tableaux Word par niveau.</p>
+          <div style="display:flex; flex-direction:column; gap:0.5rem;">
+            <button class="btn btn-outline" onclick="exportWord(seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE'), 'primaire.docx')">
+              <i class="ri-file-word-line"></i> Tableau Primaire (${seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE').length})
+            </button>
+            <button class="btn btn-outline" onclick="exportWord(seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE'), 'secondaire.docx')">
+              <i class="ri-file-word-line"></i> Tableau Secondaire (${seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE').length})
+            </button>
+            <button class="btn btn-outline" onclick="exportWord(seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE'), 'universitaire.docx')">
+              <i class="ri-file-word-line"></i> Tableau Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE').length})
             </button>
           </div>
           
@@ -1211,6 +1229,178 @@ async function exportImagesByLevel(niveau) {
     } finally {
         btn.innerText = oldText;
         btn.disabled = false;
+    }
+}
+
+
+async function exportWord(data, filename = "seminaristes.docx") {
+    if (!data || data.length === 0) return showToast('Rien à exporter', 'warning');
+
+    // Check if docx library is loaded
+    if (typeof docx === 'undefined') {
+        showToast('Bibliothèque Word non chargée', 'error');
+        return;
+    }
+
+    const btn = event?.target;
+    if (btn) {
+        const oldText = btn.innerText;
+        btn.innerText = 'Génération...';
+        btn.disabled = true;
+    }
+
+    try {
+        // Helper function to fetch image and convert to base64
+        async function getImageBuffer(url) {
+            try {
+                // If it's already a data URL
+                if (url.startsWith('data:')) {
+                    const base64 = url.split(',')[1];
+                    const binary = atob(base64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    return bytes;
+                }
+
+                // Fetch from URL
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Failed to fetch image');
+                const blob = await response.blob();
+                const arrayBuffer = await blob.arrayBuffer();
+                return new Uint8Array(arrayBuffer);
+            } catch (err) {
+                console.warn('Failed to load image:', url, err);
+                return null;
+            }
+        }
+
+        // Create table rows
+        const tableRows = [
+            // Header row
+            new docx.TableRow({
+                children: [
+                    new docx.TableCell({
+                        children: [new docx.Paragraph({ text: "Matricule", bold: true })],
+                        shading: { fill: "3B82F6" },
+                    }),
+                    new docx.TableCell({
+                        children: [new docx.Paragraph({ text: "Nom", bold: true })],
+                        shading: { fill: "3B82F6" },
+                    }),
+                    new docx.TableCell({
+                        children: [new docx.Paragraph({ text: "Prénom", bold: true })],
+                        shading: { fill: "3B82F6" },
+                    }),
+                    new docx.TableCell({
+                        children: [new docx.Paragraph({ text: "Photo", bold: true })],
+                        shading: { fill: "3B82F6" },
+                    }),
+                ],
+                tableHeader: true,
+            })
+        ];
+
+        // Add data rows
+        for (const s of data) {
+            const cells = [];
+
+            // Matricule
+            cells.push(new docx.TableCell({
+                children: [new docx.Paragraph(s.matricule || '')],
+            }));
+
+            // Nom
+            cells.push(new docx.TableCell({
+                children: [new docx.Paragraph(s.nom || '')],
+            }));
+
+            // Prénom
+            cells.push(new docx.TableCell({
+                children: [new docx.Paragraph(s.prenom || '')],
+            }));
+
+            // Photo
+            if (s.photo_url) {
+                try {
+                    const imageBuffer = await getImageBuffer(s.photo_url);
+                    if (imageBuffer) {
+                        cells.push(new docx.TableCell({
+                            children: [
+                                new docx.Paragraph({
+                                    children: [
+                                        new docx.ImageRun({
+                                            data: imageBuffer,
+                                            transformation: {
+                                                width: 60,
+                                                height: 80,
+                                            },
+                                        })
+                                    ],
+                                })
+                            ],
+                        }));
+                    } else {
+                        cells.push(new docx.TableCell({
+                            children: [new docx.Paragraph('(Photo indisponible)')],
+                        }));
+                    }
+                } catch (err) {
+                    console.warn('Error adding image:', err);
+                    cells.push(new docx.TableCell({
+                        children: [new docx.Paragraph('(Erreur photo)')],
+                    }));
+                }
+            } else {
+                cells.push(new docx.TableCell({
+                    children: [new docx.Paragraph('(Aucune photo)')],
+                }));
+            }
+
+            tableRows.push(new docx.TableRow({ children: cells }));
+        }
+
+        // Create the document
+        const doc = new docx.Document({
+            sections: [{
+                properties: {},
+                children: [
+                    new docx.Paragraph({
+                        text: "Liste des Séminaristes",
+                        heading: docx.HeadingLevel.HEADING_1,
+                        spacing: { after: 200 },
+                    }),
+                    new docx.Table({
+                        rows: tableRows,
+                        width: {
+                            size: 100,
+                            type: docx.WidthType.PERCENTAGE,
+                        },
+                    }),
+                ],
+            }],
+        });
+
+        // Generate and download
+        const blob = await docx.Packer.toBlob(doc);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        showToast(`Document Word généré: ${filename}`, 'success');
+
+    } catch (err) {
+        console.error('Export Word failed', err);
+        showToast('Erreur lors de la génération du document Word', 'error');
+    } finally {
+        if (btn) {
+            btn.innerText = oldText;
+            btn.disabled = false;
+        }
     }
 }
 
