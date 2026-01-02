@@ -318,22 +318,37 @@ function ensureDerivedFields(s) {
         s.matricule = '25-JOS' + next.toString().padStart(3, '0');
     }
 
-    // 2. Genre normalization
-    s.genre = (s.genre && s.genre.toUpperCase().startsWith('F')) ? 'F' : 'M';
+    // 2. Data Type Safety & Defaults
+    // Coerce to number, handling empty strings and nulls
+    const parseOrZero = (val) => {
+        if (val === undefined || val === null || val === '') return 0;
+        const n = Number(val);
+        return isNaN(n) ? 0 : n;
+    };
 
-    // 3. Niveau logic
-    const note = parseFloat(s.note);
-    s.niveau = 'NIVEAU PRIMAIRE'; // default
-    if (!isNaN(note)) {
-        if (note > 10) s.niveau = 'NIVEAU UNIVERSITAIRE';
-        else if (note > 6) s.niveau = 'NIVEAU SECONDAIRE';
+    // Note Admission
+    s.note = parseOrZero(s.note);
+
+    // Test Sortie (Default 0)
+    s.test_sortie = parseOrZero(s.test_sortie);
+
+    // Note Conduite (Default 16)
+    if (s.note_conduite === undefined || s.note_conduite === null || s.note_conduite === '') {
+        s.note_conduite = 16;
+    } else {
+        s.note_conduite = Number(s.note_conduite);
+        if (isNaN(s.note_conduite)) s.note_conduite = 16; // Fallback if invalid
     }
 
-    // New Fields defaults
-    if (s.note_conduite === undefined || s.note_conduite === null) s.note_conduite = 16;
-    if (s.test_sortie === undefined || s.test_sortie === null) s.test_sortie = 0;
+    // 3. Genre normalization
+    s.genre = (s.genre && s.genre.toUpperCase().startsWith('F')) ? 'F' : 'M';
 
-    // 4. Dortoir / Halaqa automation (only if missing)
+    // 4. Niveau logic (uses s.note which is now a Number)
+    s.niveau = 'NIVEAU PRIMAIRE'; // default
+    if (s.note > 10) s.niveau = 'NIVEAU UNIVERSITAIRE';
+    else if (s.note > 6) s.niveau = 'NIVEAU SECONDAIRE';
+
+    // 5. Dortoir / Halaqa automation (only if missing)
     const isFem = (s.genre === 'F');
     const dList = isFem ? DORTOIRS_SOEURS : DORTOIRS_FRERES;
 
