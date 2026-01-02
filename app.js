@@ -329,6 +329,10 @@ function ensureDerivedFields(s) {
         else if (note > 6) s.niveau = 'NIVEAU SECONDAIRE';
     }
 
+    // New Fields defaults
+    if (s.note_conduite === undefined || s.note_conduite === null) s.note_conduite = 16;
+    if (s.test_sortie === undefined || s.test_sortie === null) s.test_sortie = 0;
+
     // 4. Dortoir / Halaqa automation (only if missing)
     const isFem = (s.genre === 'F');
     const dList = isFem ? DORTOIRS_SOEURS : DORTOIRS_FRERES;
@@ -631,14 +635,22 @@ function renderForm(data = null) {
             </div>
           </div>
 
-          <div class="grid-form" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom:1rem;">
+          <div class="grid-form" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom:1rem;">
             <div class="form-group">
               <label class="form-label">Age</label>
               <input type="number" id="f_age" class="form-control" value="${data?.age || ''}">
             </div>
             <div class="form-group">
-              <label class="form-label">Note</label>
+              <label class="form-label">Note (Admission)</label>
               <input type="number" step="0.1" id="f_note" class="form-control" value="${data?.note !== undefined ? data.note : '10'}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Test Sortie</label>
+                <input type="number" step="0.1" id="f_test_sortie" class="form-control" value="${data?.test_sortie !== undefined ? data.test_sortie : '0'}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Conduite (/20)</label>
+                <input type="number" step="0.1" id="f_note_conduite" class="form-control" value="${data?.note_conduite !== undefined ? data.note_conduite : '16'}">
             </div>
             <div class="form-group">
               <label class="form-label">Genre</label>
@@ -814,6 +826,8 @@ function renderForm(data = null) {
                 prenom: document.getElementById('f_prenom').value,
                 age: document.getElementById('f_age').value,
                 note: document.getElementById('f_note').value,
+                test_sortie: document.getElementById('f_test_sortie').value,
+                note_conduite: document.getElementById('f_note_conduite').value,
                 genre: document.getElementById('f_genre').value,
                 contact: document.getElementById('f_contact').value,
                 photo_url: photoUrl
@@ -827,6 +841,8 @@ function renderForm(data = null) {
                 delete preserved.prenom;
                 delete preserved.age;
                 delete preserved.note;
+                delete preserved.test_sortie;
+                delete preserved.note_conduite;
                 delete preserved.genre;
                 delete preserved.contact;
                 delete preserved.photo_url;
@@ -950,8 +966,8 @@ function renderLevelsByGenre() {
             <span class="badge">${g.count}</span>
         </a>
         <div style="display:flex; gap:0.5rem; margin-left:1rem;">
-            <button class="btn btn-outline btn-sm" onclick="exportExcel(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}.xlsx')">
-                <i class="ri-file-excel-line"></i> Excel
+            <button class="btn btn-outline btn-sm" onclick="exportRankedExcel(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}_rang.xlsx')">
+                <i class="ri-file-excel-line"></i> Excel (Rang)
             </button>
             <button class="btn btn-outline btn-sm" onclick="exportWord(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}.docx')">
                 <i class="ri-file-word-line"></i> Word
@@ -1123,6 +1139,8 @@ function renderImportExport() {
                         prenom: getVal(['Prenom', 'prenom', 'PRENOM']),
                         age: getNum(['Age', 'age']),
                         note: getNum(['Note', 'note']),
+                        test_sortie: getNum(['Test Sortie', 'test_sortie', 'TS']),
+                        note_conduite: getNum(['Conduite', 'note_conduite', 'NC']),
                         genre: getVal(['Genre', 'genre', 'Sexe']),
                         contact: getVal(['Contact', 'contact'])
                     };
@@ -1218,6 +1236,55 @@ function exportExcel(data, filename = "seminaristes_export.xlsx") {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Export");
+    XLSX.writeFile(wb, filename);
+}
+
+// Specialized export with Ranking
+function exportRankedExcel(data, filename) {
+    if (!data || data.length === 0) return showToast('Rien à exporter', 'warning');
+
+    // 1. Calculate Averages and Prepare Data
+    const processed = data.map(s => {
+        const n1 = parseFloat(s.note) || 0;
+        const n2 = parseFloat(s.test_sortie) || 0;
+        const n3 = parseFloat(s.note_conduite) || 0;
+        const avg = (n1 + n2 + n3) / 3;
+
+        return {
+            ...s,
+            _avg: avg
+        };
+    });
+
+    // 2. Sort by Average DESC
+    processed.sort((a, b) => b._avg - a._avg);
+
+    // 3. Map to Final Columns with Rank
+    const exportData = processed.map((s, index) => ({
+        'Rang': index + 1,
+        'Nom': s.nom,
+        'Prénom': s.prenom,
+        'Matricule': s.matricule,
+        'Niveau': s.niveau,
+        'Dortoir': s.dortoir,
+        'Halaqa': s.halaqa,
+        'Note Admission': s.note,
+        'Test Sortie': s.test_sortie,
+        'Conduite': s.note_conduite,
+        'Moyenne': s._avg.toFixed(2),
+        'Contact': s.contact
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+
+    // Auto-width adjustment (basic estimation)
+    const wscols = Object.keys(exportData[0]).map(k => ({ wch: 15 }));
+    wscols[1] = { wch: 20 }; // Nom
+    wscols[2] = { wch: 20 }; // Prenom
+    ws['!cols'] = wscols;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Classement");
     XLSX.writeFile(wb, filename);
 }
 
