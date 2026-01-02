@@ -1275,20 +1275,25 @@ function exportRankedExcel(data, filename) {
     processed.sort((a, b) => b._avg - a._avg);
 
     // 3. Map to Final Columns with Rank
-    const exportData = processed.map((s, index) => ({
-        'Rang': index + 1,
-        'Nom': s.nom,
-        'Prénom': s.prenom,
-        'Matricule': s.matricule,
-        'Niveau': s.niveau,
-        'Dortoir': s.dortoir,
-        'Halaqa': s.halaqa,
-        'Note Admission': s.note,
-        'Test Sortie': s.test_sortie,
-        'Conduite': s.note_conduite,
-        'Moyenne': s._avg.toFixed(2),
-        'Contact': s.contact
-    }));
+    const exportData = processed.map((s, index) => {
+        const r = index + 1;
+        const rankStr = (r === 1) ? '1er' : `${r}ème`;
+
+        return {
+            'Rang': rankStr,
+            'Nom': s.nom,
+            'Prénom': s.prenom,
+            'Matricule': s.matricule,
+            'Niveau': s.niveau,
+            'Dortoir': s.dortoir,
+            'Halaqa': s.halaqa,
+            'Note Admission': s.note,
+            'Test Sortie': s.test_sortie,
+            'Conduite': s.note_conduite,
+            'Moyenne': s._avg.toFixed(2),
+            'Contact': s.contact
+        };
+    });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
 
