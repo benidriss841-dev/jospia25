@@ -56,6 +56,18 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
+    console.log('App: Initialisation...');
+
+    // Handle sidebar toggle on mobile
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const sidebar = document.querySelector('.sidebar');
+    if (mobileMenuBtn) {
+        mobileMenuBtn.onclick = () => {
+            console.log('Mobile Menu: Toggle');
+            sidebar.classList.toggle('mobile-open');
+        };
+    }
+
     // Check authentication first
     if (!currentUserRole) {
         showLoginModal();
@@ -78,15 +90,6 @@ async function initApp() {
     } else {
         showToast('Connecté à Firebase', 'success');
         subscribeToRealtime();
-    }
-
-    // Handle sidebar toggle on mobile
-    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-    const sidebar = document.querySelector('.sidebar');
-    if (mobileMenuBtn) {
-        mobileMenuBtn.onclick = () => {
-            sidebar.classList.toggle('mobile-open');
-        };
     }
 
     // Bind sidebar clicks
