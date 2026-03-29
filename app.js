@@ -701,10 +701,19 @@ function renderForm(data = null) {
                 <input type="number" step="0.1" id="f_test_sortie" class="form-control" value="${data?.test_sortie !== undefined ? data.test_sortie : '0'}">
             </div>
             <div class="form-group">
+              <label class="form-label">Genre</label>
+              <select id="f_genre" class="form-select">
+                <option value="M" ${data?.genre === 'M' ? 'selected' : ''}>M</option>
+                <option value="F" ${data?.genre === 'F' ? 'selected' : ''}>F</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-form" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom:1rem;">
+            <div class="form-group">
                 <label class="form-label">Conduite (/20)</label>
                 <input type="number" step="0.1" id="f_note_conduite" class="form-control" value="${data?.note_conduite !== undefined ? data.note_conduite : '16'}">
             </div>
-          <div class="grid-form" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom:1rem;">
             <div class="form-group">
                 <label class="form-label">Sous Comité (*)</label>
                 <select id="f_sous_comite" class="form-select" required>
@@ -713,10 +722,6 @@ function renderForm(data = null) {
                         <option value="${c}" ${data?.sous_comite === c ? 'selected' : ''}>${c}</option>
                     `).join('')}
                 </select>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Quartier</label>
-                <input type="text" id="f_quartier" class="form-control" value="${data?.quartier || ''}">
             </div>
           </div>
 
@@ -731,9 +736,15 @@ function renderForm(data = null) {
             </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Contact Séminariste</label>
-            <input type="text" id="f_contact" class="form-control" value="${data?.contact || ''}">
+          <div class="grid-form" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom:1rem;">
+            <div class="form-group">
+                <label class="form-label">Quartier</label>
+                <input type="text" id="f_quartier" class="form-control" value="${data?.quartier || ''}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Contact Séminariste</label>
+                <input type="text" id="f_contact" class="form-control" value="${data?.contact || ''}">
+            </div>
           </div>
 
           <div class="form-group">
