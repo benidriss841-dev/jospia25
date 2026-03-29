@@ -30,7 +30,7 @@ async function generateReceiptPDF(seminariste) {
 
         doc.setFontSize(14);
         doc.setFont('helvetica', 'normal');
-        doc.text('JOSPIA -2025', 105, 30, { align: 'center' });
+        doc.text('SERFAN - 2026', 105, 30, { align: 'center' });
 
         // Photo section
         if (seminariste.photo_url) {
@@ -119,7 +119,7 @@ async function generateReceiptPDF(seminariste) {
         yPos += 10;
         doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);
-        doc.text('JOSPIA - Commission Administration & Scientifique', 105, yPos, { align: 'center' });
+        doc.text('SERFAN - Commission Administration & Scientifique', 105, yPos, { align: 'center' });
         yPos += 5;
         doc.text('Ce document certifie l\'inscription du séminariste mentionné ci-dessus', 105, yPos, { align: 'center' });
 
@@ -305,7 +305,7 @@ async function generateReceiptPDFBlob(seminariste) {
 
     doc.setFontSize(14);
     doc.setFont('helvetica', 'normal');
-    doc.text('JOSPIA - Séminaire Islamique', 105, 30, { align: 'center' });
+    doc.text('SERFAN - Séminaire Islamique', 105, 30, { align: 'center' });
 
     // Photo section
     if (seminariste.photo_url) {
@@ -391,7 +391,7 @@ async function generateReceiptPDFBlob(seminariste) {
     yPos += 10;
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    doc.text('JOSPIA - Commission Administration & Scientifique', 105, yPos, { align: 'center' });
+    doc.text('SERFAN - Commission Administration & Scientifique', 105, yPos, { align: 'center' });
     yPos += 5;
     doc.text('Ce document certifie l\'inscription du séminariste mentionné ci-dessus', 105, yPos, { align: 'center' });
 

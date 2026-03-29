@@ -20,8 +20,8 @@ const CLOUDINARY_UPLOAD_PRESET = 'jospia'; // Unsigned preset
    STATE & CONSTANTS
    ============================================== */
 let seminaristes = []; // Local cache
-const DORTOIRS_FRERES = ["IMAM MÂLIK IBN ANAS", "IMAM ASH-SHÂFI‘Î", "IMAM AHMAD IBN HANBAL", "IMAM ABÛ HANÎFA"];
-const DORTOIRS_SOEURS = ["MARYAM BINT ‘IMRÂN", "ASSYA BINT MUZAHIM", "KHADÎJAH BINT KHUWAYLID", "FÂTIMA AZ-ZAHRÂ"];
+const DORTOIRS_FRERES = ["IMAM MÂLIK IBN ANAS", "IMAM ASH-SHÂFI‘Î", "IMAM AHMAD IBN HANBAL", "IMAM ABÛ HANÎFA", "IMAM AL-BOUKHARI"];
+const DORTOIRS_SOEURS = ["MARYAM BINT ‘IMRÂN", "ASSYA BINT MUZAHIM", "KHADÎJAH BINT KHUWAYLID", "FÂTIMA AZ-ZAHRÂ", "AÏCHA BINT ABI BAKR"];
 const GROUPE_HARAKAS_KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 // Initialize Firebase Globals
@@ -321,7 +321,7 @@ async function batchImport(rows) {
    ============================================== */
 function getLastMatriculeId() {
     let maxId = 0;
-    const prefix = '25-JOS';
+    const prefix = '26-SER';
     seminaristes.forEach(s => {
         if (s.matricule && s.matricule.startsWith(prefix)) {
             const num = parseInt(s.matricule.replace(prefix, ''), 10);
@@ -335,7 +335,7 @@ function ensureDerivedFields(s) {
     // 1. Matricule if missing
     if (!s.matricule) {
         const next = getLastMatriculeId() + 1;
-        s.matricule = '25-JOS' + next.toString().padStart(3, '0');
+        s.matricule = '26-SER' + next.toString().padStart(3, '0');
     }
 
     // 2. Data Type Safety & Defaults
