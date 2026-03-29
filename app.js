@@ -14,7 +14,7 @@ const firebaseConfig = {
 
 // Cloudinary
 const CLOUDINARY_CLOUD_NAME = 'dvqzhgw1o';
-const CLOUDINARY_UPLOAD_PRESET = 'jospia'; // Unsigned preset
+const CLOUDINARY_UPLOAD_PRESET = 'serfan'; // Unsigned preset
 
 /* ==============================================
    STATE & CONSTANTS
@@ -43,7 +43,7 @@ if (typeof firebase !== 'undefined') {
 
 // Fallback for local dev if keys not set
 const USE_LOCAL_STORAGE = (!USE_FIREBASE);
-const DB_KEY = 'jospia_v2_local_db';
+const DB_KEY = 'serfan_v2_local_db';
 
 // Authentication
 const ADMIN_PASSWORD = 'benfou2007';
@@ -1640,7 +1640,7 @@ function showLoginModal() {
 
     modal.innerHTML = `
         <div style="background:white;padding:2rem;border-radius:12px;max-width:400px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);">
-            <h2 style="margin:0 0 1.5rem 0;color:#1e293b;text-align:center;">JOSPIA - Connexion</h2>
+            <h2 style="margin:0 0 1.5rem 0;color:#1e293b;text-align:center;">SERFAN - Connexion</h2>
             <form id="loginForm">
                 <div style="margin-bottom:1rem;">
                     <label style="display:block;margin-bottom:0.5rem;color:#475569;font-weight:500;">Rôle</label>
