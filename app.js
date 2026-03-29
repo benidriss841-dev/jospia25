@@ -636,7 +636,7 @@ function generateTableHTML(list) {
       </td>
       <td><strong>${s.nom}</strong> ${s.prenom}</td>
       <td><span style="font-family:monospace;background:#f1f5f9;padding:2px 6px;border-radius:4px">${s.matricule}</span></td>
-      <td>${s.niveau ? s.niveau.replace('NIVEAU ', '') : '-'}</td>
+      <td>${s.sous_comite || '-'}</td>
       <td>${s.dortoir || '-'}</td>
       <td>
         <button class="btn btn-outline btn-sm" onclick="routeTo('edit', '${s.matricule}')">Gérer</button>
@@ -652,7 +652,7 @@ function generateTableHTML(list) {
             <th style="width:60px">Img</th>
             <th>Nom Complet</th>
             <th>Matricule</th>
-            <th>Niveau</th>
+            <th>Sous-Comité</th>
             <th>Dortoir</th>
             <th style="width:100px">Action</th>
           </tr>
@@ -704,17 +704,35 @@ function renderForm(data = null) {
                 <label class="form-label">Conduite (/20)</label>
                 <input type="number" step="0.1" id="f_note_conduite" class="form-control" value="${data?.note_conduite !== undefined ? data.note_conduite : '16'}">
             </div>
+          <div class="grid-form" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom:1rem;">
             <div class="form-group">
-              <label class="form-label">Genre</label>
-              <select id="f_genre" class="form-select">
-                <option value="M" ${data?.genre === 'M' ? 'selected' : ''}>M</option>
-                <option value="F" ${data?.genre === 'F' ? 'selected' : ''}>F</option>
-              </select>
+                <label class="form-label">Sous Comité (*)</label>
+                <select id="f_sous_comite" class="form-select" required>
+                    <option value="">-- Sélectionner --</option>
+                    ${['Abobo1', 'Abobo2', 'Abobo3', 'Abobo4', 'Anyama1', 'Anyama2', 'Nangui abrogoua'].map(c => `
+                        <option value="${c}" ${data?.sous_comite === c ? 'selected' : ''}>${c}</option>
+                    `).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Quartier</label>
+                <input type="text" id="f_quartier" class="form-control" value="${data?.quartier || ''}">
+            </div>
+          </div>
+
+          <div class="grid-form" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom:1rem;">
+            <div class="form-group">
+                <label class="form-label">Nom d'un parent</label>
+                <input type="text" id="f_nom_parent" class="form-control" value="${data?.nom_parent || ''}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Contact parent</label>
+                <input type="text" id="f_contact_parent" class="form-control" value="${data?.contact_parent || ''}">
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Contact</label>
+            <label class="form-label">Contact Séminariste</label>
             <input type="text" id="f_contact" class="form-control" value="${data?.contact || ''}">
           </div>
 
@@ -882,6 +900,10 @@ function renderForm(data = null) {
                 note_conduite: document.getElementById('f_note_conduite').value,
                 genre: document.getElementById('f_genre').value,
                 contact: document.getElementById('f_contact').value,
+                sous_comite: document.getElementById('f_sous_comite').value,
+                quartier: document.getElementById('f_quartier').value,
+                nom_parent: document.getElementById('f_nom_parent').value,
+                contact_parent: document.getElementById('f_contact_parent').value,
                 photo_url: photoUrl
             };
 
@@ -897,6 +919,10 @@ function renderForm(data = null) {
                 delete preserved.note_conduite;
                 delete preserved.genre;
                 delete preserved.contact;
+                delete preserved.sous_comite;
+                delete preserved.quartier;
+                delete preserved.nom_parent;
+                delete preserved.contact_parent;
                 delete preserved.photo_url;
 
                 Object.assign(payload, preserved);
@@ -1054,7 +1080,7 @@ function renderImportExport() {
         <div style="padding:2rem">
           <p class="form-label" style="margin-bottom:1rem">
             Sélectionnez plusieurs photos. Le nom de chaque fichier doit correspondre au <strong>matricule</strong> du séminariste.<br>
-            <small style="color: var(--muted)">Ex: 25-JOS001.jpg, 25-JOS002.png, etc.</small>
+            <small style="color: var(--muted)">Ex: 26-SERF001.jpg, 26-SERF002.png, etc.</small>
           </p>
           <input type="file" id="importPhotos" accept="image/*" multiple class="form-control mb-3">
           <button class="btn btn-primary" id="btnImportPhotos">
