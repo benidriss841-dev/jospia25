@@ -321,7 +321,7 @@ async function batchImport(rows) {
    ============================================== */
 function getLastMatriculeId() {
     let maxId = 0;
-    const prefix = '26-SER';
+    const prefix = '26-SERF';
     seminaristes.forEach(s => {
         if (s.matricule && s.matricule.startsWith(prefix)) {
             const num = parseInt(s.matricule.replace(prefix, ''), 10);
@@ -335,7 +335,7 @@ function ensureDerivedFields(s) {
     // 1. Matricule if missing
     if (!s.matricule) {
         const next = getLastMatriculeId() + 1;
-        s.matricule = '26-SER' + next.toString().padStart(3, '0');
+        s.matricule = '26-SERF' + next.toString().padStart(3, '0');
     }
 
     // 2. Data Type Safety & Defaults
