@@ -24,18 +24,7 @@ const DORTOIRS_FRERES = ["IMAM MÂLIK IBN ANAS", "IMAM ASH-SHÂFI‘Î", "IMAM A
 const DORTOIRS_SOEURS = ["MARYAM BINT ‘IMRÂN", "ASSYA BINT MUZAHIM", "KHADÎJAH BINT KHUWAYLID", "FÂTIMA AZ-ZAHRÂ"];
 const GROUPE_HARAKAS_KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-// Fallback for local dev if keys not set
-const USE_LOCAL_STORAGE = (!db && !USE_FIREBASE);
-const DB_KEY = 'jospia_v2_local_db';
-
-// Authentication
-const ADMIN_PASSWORD = 'benfou2007';
-let currentUserRole = sessionStorage.getItem('userRole') || null; // 'admin' or 'user'
-
-/* ==============================================
-   INIT
-   ============================================== */
-// Initialize Firebase
+// Initialize Firebase Globals
 let db = null;
 let USE_FIREBASE = false;
 
@@ -49,8 +38,18 @@ if (typeof firebase !== 'undefined') {
         console.error('Firebase: Erreur initialisation', e);
     }
 } else {
-    console.error('Firebase: La bibliothèque est introuvable (Vérifiez votre connexion ou index.html)');
+    console.warn('Firebase: La bibliothèque est introuvable (Mode Local)');
 }
+
+// Fallback for local dev if keys not set
+const USE_LOCAL_STORAGE = (!USE_FIREBASE);
+const DB_KEY = 'jospia_v2_local_db';
+
+// Authentication
+const ADMIN_PASSWORD = 'benfou2007';
+let currentUserRole = sessionStorage.getItem('userRole') || null; // 'admin' or 'user'
+
+// ... Firebase init moved up ...
 
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -104,20 +103,21 @@ async function initApp() {
 /* ==============================================
    DATA LAYER (Firebase + LocalStorage Fallback)
    ============================================== */
-if (!USE_FIREBASE) {
-    const stored = localStorage.getItem(DB_KEY);
-    seminaristes = stored ? JSON.parse(stored) : [];
-} else {
-    try {
-        const snapshot = await db.collection('seminaristes').get();
-        seminaristes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (err) {
-        console.error('Firebase load error:', err);
-        showToast('Erreur chargement données', 'error');
+async function loadData() {
+    if (!USE_FIREBASE) {
+        const stored = localStorage.getItem(DB_KEY);
+        seminaristes = stored ? JSON.parse(stored) : [];
+    } else {
+        try {
+            const snapshot = await db.collection('seminaristes').get();
+            seminaristes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (err) {
+            console.error('Firebase load error:', err);
+            showToast('Erreur chargement données', 'error');
+        }
     }
-}
-// Enrich with photo URLs based on matricule
-seminaristes = seminaristes.map(s => ({ ...s, photo_url: s.photo_url || getPhotoUrl(s.matricule) }));
+    // Enrich with photo URLs based on matricule
+    seminaristes = seminaristes.map(s => ({ ...s, photo_url: s.photo_url || getPhotoUrl(s.matricule) }));
 }
 
 async function saveData(newItem, isUpdate = false) {
