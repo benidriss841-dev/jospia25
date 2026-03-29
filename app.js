@@ -2,8 +2,15 @@
    CONFIGURATION
    ============================================== */
 // !!! IMPORTANT: USER MUST FILL THESE IN !!!
-const SUPABASE_URL = 'https://ajpvmjwtimvgxigknxit.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_9ZWXQNhBCd2Svtek_uiwGw_hjZYEmqU';
+const firebaseConfig = {
+    apiKey: "AIzaSyCLacVDPeWpRPwhE6tzJOLaoxSIuRYmBNk",
+    authDomain: "serfan-961a4.firebaseapp.com",
+    projectId: "serfan-961a4",
+    storageBucket: "serfan-961a4.firebasestorage.app",
+    messagingSenderId: "744180827763",
+    appId: "1:744180827763:web:a0cd3cdc9b8d47e589cc06",
+    measurementId: "G-5STG5E494X"
+};
 
 // Cloudinary
 const CLOUDINARY_CLOUD_NAME = 'dvqzhgw1o';
@@ -18,7 +25,7 @@ const DORTOIRS_SOEURS = ["MARYAM BINT ‘IMRÂN", "ASSYA BINT MUZAHIM", "KHADÎJ
 const GROUPE_HARAKAS_KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 // Fallback for local dev if keys not set
-const USE_LOCAL_STORAGE = (!SUPABASE_URL || SUPABASE_URL.includes('YOUR_'));
+const USE_LOCAL_STORAGE = (!db && !USE_FIREBASE);
 const DB_KEY = 'jospia_v2_local_db';
 
 // Authentication
@@ -28,9 +35,22 @@ let currentUserRole = sessionStorage.getItem('userRole') || null; // 'admin' or 
 /* ==============================================
    INIT
    ============================================== */
-const supabaseClient = (typeof supabase !== 'undefined' && typeof supabase.createClient === 'function' && !USE_LOCAL_STORAGE)
-    ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
+// Initialize Firebase
+let db = null;
+let USE_FIREBASE = false;
+
+if (typeof firebase !== 'undefined') {
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        USE_FIREBASE = true;
+        console.log('Firebase: Initialisation réussie (Firestore prêt)');
+    } catch (e) {
+        console.error('Firebase: Erreur initialisation', e);
+    }
+} else {
+    console.error('Firebase: La bibliothèque est introuvable (Vérifiez votre connexion ou index.html)');
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -54,10 +74,10 @@ async function initApp() {
         routeTo('add');
     }
 
-    if (USE_LOCAL_STORAGE) {
-        showToast('Mode Local (Pas de Supabase configuré)', 'warning');
+    if (!USE_FIREBASE) {
+        showToast('Mode Local (Pas de Firebase configuré)', 'warning');
     } else {
-        showToast('Connecté à Supabase', 'success');
+        showToast('Connecté à Firebase', 'success');
         subscribeToRealtime();
     }
 
@@ -82,39 +102,34 @@ async function initApp() {
 }
 
 /* ==============================================
-   DATA LAYER (Supabase + LocalStorage Fallback)
+   DATA LAYER (Firebase + LocalStorage Fallback)
    ============================================== */
-async function loadData() {
-    if (USE_LOCAL_STORAGE) {
-        const stored = localStorage.getItem(DB_KEY);
-        seminaristes = stored ? JSON.parse(stored) : [];
-    } else {
-        try {
-            const { data, error } = await supabaseClient.from('seminaristes').select('*');
-            if (error) {
-                if (error.code === 'PGRST205' || (error.message && error.message.includes('relation "public.seminaristes" does not exist'))) {
-                    showToast('ERREUR: Table "seminaristes" introuvable dans Supabase. Exécutez le script SQL.', 'error');
-                } else {
-                    throw error;
-                }
-            }
-            seminaristes = data || [];
-        } catch (err) {
-            console.error('Supabase load error:', err);
-            if (!err.code) showToast('Erreur chargement données', 'error');
-        }
+if (!USE_FIREBASE) {
+    const stored = localStorage.getItem(DB_KEY);
+    seminaristes = stored ? JSON.parse(stored) : [];
+} else {
+    try {
+        const snapshot = await db.collection('seminaristes').get();
+        seminaristes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (err) {
+        console.error('Firebase load error:', err);
+        showToast('Erreur chargement données', 'error');
     }
-    // Enrich with photo URLs based on matricule
-    seminaristes = seminaristes.map(s => ({ ...s, photo_url: s.photo_url || getPhotoUrl(s.matricule) }));
+}
+// Enrich with photo URLs based on matricule
+seminaristes = seminaristes.map(s => ({ ...s, photo_url: s.photo_url || getPhotoUrl(s.matricule) }));
 }
 
 async function saveData(newItem, isUpdate = false) {
-    // Logic: Ensure derived fields (niveau etc) are set before saving
-    newItem = ensureDerivedFields(newItem);
+    if (!newItem) return;
 
-    if (USE_LOCAL_STORAGE) {
+    // Ensure matricule is set
+    newItem = ensureDerivedFields(newItem);
+    const matricule = newItem.matricule;
+
+    if (!USE_FIREBASE) {
         if (isUpdate) {
-            const index = seminaristes.findIndex(s => s.matricule === newItem.matricule);
+            const index = seminaristes.findIndex(s => s.matricule === matricule);
             if (index >= 0) seminaristes[index] = newItem;
         } else {
             seminaristes.push(newItem);
@@ -122,38 +137,50 @@ async function saveData(newItem, isUpdate = false) {
         localStorage.setItem(DB_KEY, JSON.stringify(seminaristes));
         return newItem;
     } else {
-        // Supabase
         try {
-            const { data, error } = await supabaseClient
-                .from('seminaristes')
-                .upsert(newItem)
-                .select();
-            if (error) {
-                if (error.code === 'PGRST205' || (error.message && error.message.includes('relation "public.seminaristes" does not exist'))) {
-                    showToast('ERREUR: Table manquante. Allez dans Supabase SQL Editor.', 'error');
-                    throw new Error('Table missing');
-                }
-                throw error;
-            }
-            // Refresh local cache
+            console.log('Firebase: Tentative de setDoc sur', matricule, newItem);
+            // On s'assure que le matricule n'est pas vide pour l'ID du document
+            if (!matricule) throw new Error('Matricule manquant');
+
+            await db.collection('seminaristes').doc(matricule).set(newItem);
+            console.log('Firebase: Succès pour', matricule);
+
             await loadData();
-            return data[0];
+            return newItem;
         } catch (err) {
-            console.error('Supabase save error:', err);
-            if (err.message !== 'Table missing') showToast('Erreur sauvegarde', 'error');
+            console.error('Firebase save error details:', err);
+            // S'il s'agit d'un problème de droits, err.code sera 'permission-denied'
+            let msg = 'Erreur technique';
+            if (err.code === 'permission-denied') msg = 'Permission refusée (Vérifiez les règles Firestore)';
+            else if (err.message) msg = err.message;
+
+            showToast('Erreur sauvegarde: ' + msg, 'error');
             throw err;
         }
     }
 }
 
+async function getDataByMatricule(matricule) {
+    if (!USE_FIREBASE) {
+        return seminaristes.find(s => s.matricule === matricule);
+    } else {
+        try {
+            const doc = await db.collection('seminaristes').doc(matricule).get();
+            return doc.exists ? { id: doc.id, ...doc.data() } : null;
+        } catch (err) {
+            console.error('Firebase get error:', err);
+            return null;
+        }
+    }
+}
+
 async function deleteData(matricule) {
-    if (USE_LOCAL_STORAGE) {
+    if (!USE_FIREBASE) {
         seminaristes = seminaristes.filter(s => s.matricule !== matricule);
         localStorage.setItem(DB_KEY, JSON.stringify(seminaristes));
     } else {
         try {
-            const { error } = await supabaseClient.from('seminaristes').delete().eq('matricule', matricule);
-            if (error) throw error;
+            await db.collection('seminaristes').doc(matricule).delete();
             await loadData();
         } catch (err) {
             console.error('Delete error', err);
@@ -165,22 +192,24 @@ async function deleteData(matricule) {
 async function deleteAllData() {
     if (!confirm('ATTENTION: Vous allez supprimer TOUS les séminaristes.\n\nCette action est IRRÉVERSIBLE.\n\nVoulez-vous vraiment continuer ?')) return;
 
-    // Seconde confirmation
-    if (!prompt('Pour confirmer, tapez "SUPPRIMER" en majuscules :') === 'SUPPRIMER') {
+    if (prompt('Pour confirmer, tapez "SUPPRIMER" en majuscules :') !== 'SUPPRIMER') {
         showToast('Suppression annulée', 'info');
         return;
     }
 
-    if (USE_LOCAL_STORAGE) {
+    if (!USE_FIREBASE) {
         seminaristes = [];
         localStorage.removeItem(DB_KEY);
         showToast('Toutes les données ont été effacées', 'success');
         renderDashboard();
     } else {
         try {
-            // Suppression via Supabase (nécessite une condition qui couvre tout, ex: matricule non vide)
-            const { error } = await supabaseClient.from('seminaristes').delete().neq('matricule', '000000');
-            if (error) throw error;
+            const snapshot = await db.collection('seminaristes').get();
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
 
             await loadData();
             showToast('Base de données vidée avec succès', 'success');
@@ -193,47 +222,34 @@ async function deleteAllData() {
 }
 
 function subscribeToRealtime() {
-    if (!supabaseClient) return;
+    if (!db) return;
 
-    supabaseClient
-        .channel('public:seminaristes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'seminaristes' }, (payload) => {
-            console.log('Realtime Change:', payload);
-            const { eventType, new: newRecord, old: oldRecord } = payload;
+    db.collection('seminaristes').onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            const data = change.doc.data();
+            const matricule = change.doc.id;
 
-            if (eventType === 'INSERT') {
-                // Check uniqueness to avoid duplicates if this client triggered the insert
-                if (!seminaristes.find(s => s.matricule === newRecord.matricule)) {
-                    seminaristes.push(newRecord);
-                    showToast(`Nouvelle entrée: ${newRecord.prenom} ${newRecord.nom}`, 'info');
+            if (change.type === "added") {
+                if (!seminaristes.find(s => s.matricule === matricule)) {
+                    seminaristes.push({ id: change.doc.id, ...data });
+                    // showToast(`Nouvelle entrée: ${data.prenom} ${data.nom}`, 'info');
                 }
-            } else if (eventType === 'UPDATE') {
-                const index = seminaristes.findIndex(s => s.matricule === newRecord.matricule);
+            }
+            if (change.type === "modified") {
+                const index = seminaristes.findIndex(s => s.matricule === matricule);
                 if (index !== -1) {
-                    seminaristes[index] = newRecord;
-                } else {
-                    // Falls back to adding if for some reason we didn't have it
-                    seminaristes.push(newRecord);
+                    seminaristes[index] = { id: change.doc.id, ...data };
                 }
-            } else if (eventType === 'DELETE') {
-                seminaristes = seminaristes.filter(s => s.matricule !== oldRecord.matricule);
             }
-
-            // Refresh current view if applicable
-            refreshCurrentView();
-        })
-        .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                showToast('Synchro en direct active 🟢', 'success');
-            }
-            if (status === 'CHANNEL_ERROR') {
-                showToast('Erreur synchro (Check Dashboard) 🔴', 'error');
-                console.error('Realtime channel error');
-            }
-            if (status === 'TIMED_OUT') {
-                showToast('Synchro lente... 🟠', 'warning');
+            if (change.type === "removed") {
+                seminaristes = seminaristes.filter(s => s.matricule !== matricule);
             }
         });
+        refreshCurrentView();
+    }, (error) => {
+        console.error("Realtime error:", error);
+        showToast('Erreur synchro en direct', 'error');
+    });
 }
 
 // Helper to refresh UI without full reload
@@ -281,17 +297,21 @@ async function batchImport(rows) {
         return ensureDerivedFields(r);
     });
 
-    if (USE_LOCAL_STORAGE) {
+    if (!USE_FIREBASE) {
         seminaristes = [...seminaristes, ...prepared];
         localStorage.setItem(DB_KEY, JSON.stringify(seminaristes));
     } else {
         try {
-            const { error } = await supabaseClient.from('seminaristes').insert(prepared);
-            if (error) throw error;
+            const batch = db.batch();
+            prepared.forEach(p => {
+                const docRef = db.collection('seminaristes').doc(p.matricule);
+                batch.set(docRef, p);
+            });
+            await batch.commit();
             await loadData();
         } catch (err) {
             console.error('Batch import error', err);
-            showToast(`Erreur import: ${err.message || err.details}`, 'error');
+            showToast(`Erreur import: ${err.message}`, 'error');
         }
     }
 }
@@ -865,7 +885,9 @@ function renderForm(data = null) {
                 Object.assign(payload, preserved);
             }
 
+            console.log('Save: Tentative d\'appel saveData avec payload:', payload);
             await saveData(payload, isEdit);
+            console.log('Save: saveData terminé avec succès');
             showToast('Enregistré avec succès', 'success');
 
             // Propose to download receipt after saving
