@@ -80,11 +80,25 @@ async function initApp() {
         subscribeToRealtime();
     }
 
+    // Handle sidebar toggle on mobile
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const sidebar = document.querySelector('.sidebar');
+    if (mobileMenuBtn) {
+        mobileMenuBtn.onclick = () => {
+            sidebar.classList.toggle('mobile-open');
+        };
+    }
+
     // Bind sidebar clicks
     document.querySelectorAll('[data-route]').forEach(el => {
         el.addEventListener('click', (e) => {
             e.preventDefault();
             const route = el.dataset.route;
+
+            // Close sidebar on mobile after clicking
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('mobile-open');
+            }
 
             // Check if route requires admin
             if (el.dataset.adminOnly === 'true' && currentUserRole !== 'admin') {

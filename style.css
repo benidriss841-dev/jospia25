@@ -458,24 +458,53 @@ tr:hover td {
 }
 
 /* Responsive */
+.mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--secondary);
+    margin-right: 1rem;
+}
+
 @media (max-width: 768px) {
     .app-container {
         flex-direction: column;
-        overflow: auto;
     }
 
     .sidebar {
-        width: 100%;
-        height: auto;
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 80%;
+        height: 100vh;
+        z-index: 1000;
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .sidebar.mobile-open {
+        left: 0;
     }
 
     .nav-menu {
-        display: none;
+        display: block;
     }
 
-    /* Mobile menu toggle would be needed for full mobile support, keeping simple for now */
-    .brand {
-        justify-content: space-between;
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    .top-bar {
+        padding: 0 1rem;
+    }
+
+    .header-top {
+        display: none;
+        /* Hide header top on very small screens if needed, or keep brief */
+    }
+
+    .content-area {
         padding: 1rem;
     }
 }
