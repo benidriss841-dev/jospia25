@@ -291,7 +291,7 @@ function refreshCurrentView() {
                 document.getElementById('searchResults').innerHTML = generateTableHTML(matches);
             }
         }
-        else if (route === 'levels') renderLevelsByGenre();
+        else if (route === 'levels') renderLevelsMixed();
         else if (route === 'dortoirs') renderGroupList('dortoir', [...DORTOIRS_FRERES, ...DORTOIRS_SOEURS]);
         else if (route === 'harakas') {
             const allH = new Set([...seminaristes.map(s => s.halaqa).filter(Boolean), ...DORTOIRS_FRERES, ...DORTOIRS_SOEURS]);
@@ -380,10 +380,17 @@ function ensureDerivedFields(s) {
     // 3. Genre normalization
     s.genre = (s.genre && s.genre.toUpperCase().startsWith('F')) ? 'F' : 'M';
 
-    // 4. Niveau logic (uses s.note which is now a Number)
-    s.niveau = 'NIVEAU PRIMAIRE'; // default
-    if (s.note > 10) s.niveau = 'NIVEAU UNIVERSITAIRE';
-    else if (s.note > 6) s.niveau = 'NIVEAU SECONDAIRE';
+    // 4. Niveau logic (uses s.note which is now a Number and s.age)
+    if (s.age && Number(s.age) < 10) {
+        s.niveau = 'NIVEAU PÉPINIÈRE';
+    } else {
+        const note = Number(s.note) || 0;
+        if (note <= 4.5) s.niveau = 'NIVEAU 1A';
+        else if (note <= 9) s.niveau = 'NIVEAU 2A';
+        else if (note <= 11) s.niveau = 'NIVEAU 1B';
+        else if (note <= 13) s.niveau = 'NIVEAU 2B';
+        else s.niveau = 'NIVEAU 3';
+    }
 
     // 5. Dortoir / Halaqa automation (only if missing)
     const isFem = (s.genre === 'F');
@@ -486,8 +493,8 @@ function routeTo(route, param = null) {
                 routeTo('dashboard');
                 return;
             }
-            pageTitle.innerText = 'Niveaux par Genre';
-            renderLevelsByGenre();
+            pageTitle.innerText = 'Niveaux';
+            renderLevelsMixed();
             break;
         case 'dortoirs':
             if (currentUserRole !== 'admin') {
@@ -540,9 +547,12 @@ function routeTo(route, param = null) {
 function renderDashboard() {
     const total = seminaristes.length;
     const levels = {
-        'NIVEAU PRIMAIRE': 0,
-        'NIVEAU SECONDAIRE': 0,
-        'NIVEAU UNIVERSITAIRE': 0
+        'NIVEAU PÉPINIÈRE': 0,
+        'NIVEAU 1A': 0,
+        'NIVEAU 2A': 0,
+        'NIVEAU 1B': 0,
+        'NIVEAU 2B': 0,
+        'NIVEAU 3': 0
     };
     seminaristes.forEach(s => {
         if (levels[s.niveau] !== undefined) levels[s.niveau]++;
@@ -559,16 +569,20 @@ function renderDashboard() {
             <span class="value">${total}</span>
           </div>
           <div class="stats-card">
-            <span class="label">Primaire</span>
-            <span class="value">${levels['NIVEAU PRIMAIRE']}</span>
+            <span class="label">Pépinière</span>
+            <span class="value">${levels['NIVEAU PÉPINIÈRE']}</span>
           </div>
           <div class="stats-card">
-            <span class="label">Secondaire</span>
-            <span class="value">${levels['NIVEAU SECONDAIRE']}</span>
+            <span class="label">Niveau 1A / 2A</span>
+            <span class="value">${levels['NIVEAU 1A'] + levels['NIVEAU 2A']}</span>
           </div>
           <div class="stats-card">
-            <span class="label">Universitaire</span>
-            <span class="value">${levels['NIVEAU UNIVERSITAIRE']}</span>
+            <span class="label">Niveau 1B / 2B</span>
+            <span class="value">${levels['NIVEAU 1B'] + levels['NIVEAU 2B']}</span>
+          </div>
+          <div class="stats-card">
+            <span class="label">Niveau 3</span>
+            <span class="value">${levels['NIVEAU 3']}</span>
           </div>
         </div>
         `;
@@ -1025,27 +1039,17 @@ function renderGroupList(key, items) {
     view.innerHTML = `<div class="list-group" style="max-width:600px">${listHtml}</div>`;
 }
 
-function renderLevelsByGenre() {
-    const levels = ['NIVEAU PRIMAIRE', 'NIVEAU SECONDAIRE', 'NIVEAU UNIVERSITAIRE'];
+function renderLevelsMixed() {
+    const levels = ['NIVEAU PÉPINIÈRE', 'NIVEAU 1A', 'NIVEAU 2A', 'NIVEAU 1B', 'NIVEAU 2B', 'NIVEAU 3'];
     const groups = [];
 
     levels.forEach(lvl => {
-        // Count M
-        const countM = seminaristes.filter(s => s.niveau === lvl && s.genre === 'M').length;
+        const count = seminaristes.filter(s => s.niveau === lvl).length;
         groups.push({
-            title: `${lvl} - FRÈRES`,
-            filters: { niveau: lvl, genre: 'M' },
-            count: countM,
-            icon: 'ri-men-line'
-        });
-
-        // Count F
-        const countF = seminaristes.filter(s => s.niveau === lvl && s.genre === 'F').length;
-        groups.push({
-            title: `${lvl} - SOEURS`,
-            filters: { niveau: lvl, genre: 'F' },
-            count: countF,
-            icon: 'ri-women-line'
+            title: lvl,
+            filters: { niveau: lvl },
+            count: count,
+            icon: 'ri-group-line'
         });
     });
 
@@ -1057,13 +1061,13 @@ function renderLevelsByGenre() {
             <span class="badge">${g.count}</span>
         </a>
         <div style="display:flex; gap:0.5rem; margin-left:1rem;">
-            <button class="btn btn-outline btn-sm" onclick="exportRankedExcel(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}_rang.xlsx')">
+            <button class="btn btn-outline btn-sm" onclick="exportRankedExcel(seminaristes.filter(s => s.niveau === '${g.filters.niveau}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}_rang.xlsx')">
                 <i class="ri-file-excel-line"></i> Excel (Rang)
             </button>
-            <button class="btn btn-outline btn-sm" onclick="exportWord(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}.docx')">
+            <button class="btn btn-outline btn-sm" onclick="exportWord(seminaristes.filter(s => s.niveau === '${g.filters.niveau}'), '${g.title.toLowerCase().replace(/\s+/g, '_')}.docx')">
                 <i class="ri-file-word-line"></i> Word
             </button>
-            <button class="btn btn-outline btn-sm" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === '${g.filters.niveau}' && s.genre === '${g.filters.genre}'), '${g.title}')">
+            <button class="btn btn-outline btn-sm" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === '${g.filters.niveau}'), '${g.title}')">
                 <i class="ri-file-pdf-line"></i> Reçus
             </button>
         </div>
@@ -1121,60 +1125,44 @@ function renderImportExport() {
           
           <p class="form-label" style="margin-bottom:1rem">Télécharger les photos par niveau.</p>
           <div style="display:flex; flex-direction:column; gap:0.5rem;">
-            <button class="btn btn-outline" onclick="exportImagesByLevel('NIVEAU PRIMAIRE')">
-              <i class="ri-download-line"></i> Primaire (${seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE' && s.photo_url).length})
-            </button>
-            <button class="btn btn-outline" onclick="exportImagesByLevel('NIVEAU SECONDAIRE')">
-              <i class="ri-download-line"></i> Secondaire (${seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE' && s.photo_url).length})
-            </button>
-            <button class="btn btn-outline" onclick="exportImagesByLevel('NIVEAU UNIVERSITAIRE')">
-              <i class="ri-download-line"></i> Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE' && s.photo_url).length})
-            </button>
+            ${['NIVEAU PÉPINIÈRE', 'NIVEAU 1A', 'NIVEAU 2A', 'NIVEAU 1B', 'NIVEAU 2B', 'NIVEAU 3'].map(lvl => `
+              <button class="btn btn-outline" onclick="exportImagesByLevel('${lvl}')">
+                <i class="ri-download-line"></i> ${lvl} (${seminaristes.filter(s => s.niveau === lvl && s.photo_url).length})
+              </button>
+            `).join('')}
           </div>
           
           <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
           
           <p class="form-label" style="margin-bottom:1rem">Télécharger les listes Excel par niveau.</p>
           <div style="display:flex; flex-direction:column; gap:0.5rem;">
-            <button class="btn btn-outline" onclick="exportExcel(seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE'), 'primaire.xlsx')">
-              <i class="ri-file-excel-line"></i> Liste Primaire (${seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE').length})
-            </button>
-            <button class="btn btn-outline" onclick="exportExcel(seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE'), 'secondaire.xlsx')">
-              <i class="ri-file-excel-line"></i> Liste Secondaire (${seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE').length})
-            </button>
-            <button class="btn btn-outline" onclick="exportExcel(seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE'), 'universitaire.xlsx')">
-              <i class="ri-file-excel-line"></i> Liste Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE').length})
-            </button>
+            ${['NIVEAU PÉPINIÈRE', 'NIVEAU 1A', 'NIVEAU 2A', 'NIVEAU 1B', 'NIVEAU 2B', 'NIVEAU 3'].map(lvl => `
+              <button class="btn btn-outline" onclick="exportExcel(seminaristes.filter(s => s.niveau === '${lvl}'), '${lvl.toLowerCase().replace(/\s+/g, '_')}.xlsx')">
+                <i class="ri-file-excel-line"></i> Liste ${lvl} (${seminaristes.filter(s => s.niveau === lvl).length})
+              </button>
+            `).join('')}
           </div>
           
           <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
           
           <p class="form-label" style="margin-bottom:1rem">Télécharger les tableaux Word par niveau.</p>
           <div style="display:flex; flex-direction:column; gap:0.5rem;">
-            <button class="btn btn-outline" onclick="exportWord(seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE'), 'primaire.docx')">
-              <i class="ri-file-word-line"></i> Tableau Primaire (${seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE').length})
-            </button>
-            <button class="btn btn-outline" onclick="exportWord(seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE'), 'secondaire.docx')">
-              <i class="ri-file-word-line"></i> Tableau Secondaire (${seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE').length})
-            </button>
-            <button class="btn btn-outline" onclick="exportWord(seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE'), 'universitaire.docx')">
-              <i class="ri-file-word-line"></i> Tableau Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE').length})
-            </button>
+            ${['NIVEAU PÉPINIÈRE', 'NIVEAU 1A', 'NIVEAU 2A', 'NIVEAU 1B', 'NIVEAU 2B', 'NIVEAU 3'].map(lvl => `
+              <button class="btn btn-outline" onclick="exportWord(seminaristes.filter(s => s.niveau === '${lvl}'), '${lvl.toLowerCase().replace(/\s+/g, '_')}.docx')">
+                <i class="ri-file-word-line"></i> Tableau ${lvl} (${seminaristes.filter(s => s.niveau === lvl).length})
+              </button>
+            `).join('')}
           </div>
           
           <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
           
           <p class="form-label" style="margin-bottom:1rem">Télécharger les reçus PDF par niveau.</p>
           <div style="display:flex; flex-direction:column; gap:0.5rem;">
-            <button class="btn btn-outline" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE'), 'Primaire')">
-              <i class="ri-file-pdf-line"></i> Reçus Primaire (${seminaristes.filter(s => s.niveau === 'NIVEAU PRIMAIRE').length})
-            </button>
-            <button class="btn btn-outline" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE'), 'Secondaire')">
-              <i class="ri-file-pdf-line"></i> Reçus Secondaire (${seminaristes.filter(s => s.niveau === 'NIVEAU SECONDAIRE').length})
-            </button>
-            <button class="btn btn-outline" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE'), 'Universitaire')">
-              <i class="ri-file-pdf-line"></i> Reçus Universitaire (${seminaristes.filter(s => s.niveau === 'NIVEAU UNIVERSITAIRE').length})
-            </button>
+            ${['NIVEAU PÉPINIÈRE', 'NIVEAU 1A', 'NIVEAU 2A', 'NIVEAU 1B', 'NIVEAU 2B', 'NIVEAU 3'].map(lvl => `
+              <button class="btn btn-outline" onclick="exportAllReceiptsPDF(seminaristes.filter(s => s.niveau === '${lvl}'), '${lvl}')">
+                <i class="ri-file-pdf-line"></i> Reçus ${lvl} (${seminaristes.filter(s => s.niveau === lvl).length})
+              </button>
+            `).join('')}
           </div>
         </div>
       </div>
