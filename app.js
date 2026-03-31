@@ -14,7 +14,8 @@ const firebaseConfig = {
 
 // Cloudinary
 const CLOUDINARY_CLOUD_NAME = 'dvqzhgw1o';
-const CLOUDINARY_UPLOAD_PRESET = 'serfan'; // Unsigned preset
+const CLOUDINARY_UPLOAD_PRESET = 'serfan_preset'; // Unsigned preset
+
 
 /* ==============================================
    STATE & CONSTANTS
