@@ -386,10 +386,10 @@ function ensureDerivedFields(s) {
         s.niveau = 'NIVEAU PÉPINIÈRE';
     } else {
         const note = Number(s.note) || 0;
-        if (note <= 4.5) s.niveau = 'NIVEAU 1A';
-        else if (note <= 9) s.niveau = 'NIVEAU 2A';
-        else if (note <= 11) s.niveau = 'NIVEAU 1B';
-        else if (note <= 13) s.niveau = 'NIVEAU 2B';
+        if (note <= 4) s.niveau = 'NIVEAU 1A';
+        else if (note <= 7) s.niveau = 'NIVEAU 2A';
+        else if (note <= 9.5) s.niveau = 'NIVEAU 1B';
+        else if (note <= 12) s.niveau = 'NIVEAU 2B';
         else s.niveau = 'NIVEAU 3';
     }
 
